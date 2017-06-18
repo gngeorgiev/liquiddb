@@ -1,7 +1,7 @@
 package tree
 
-type opInfo struct {
-	Path []string
-	Key string
+type OpInfo struct {
+	Path  []string
+	Key   string
 	Value []byte
 }

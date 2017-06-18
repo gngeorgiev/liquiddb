@@ -19,8 +19,8 @@ func New() *Tree {
 	}
 }
 
-func (tree Tree) insertPath(path []string, data map[string]interface{}) ([]opInfo, error) {
-	res := make([]opInfo, 0) //the initial size can be optimized
+func (tree Tree) insertPath(path []string, data map[string]interface{}) ([]OpInfo, error) {
+	res := make([]OpInfo, 0) //the initial size can be optimized
 
 	for k, v := range data {
 		switch t := v.(type) {
@@ -44,7 +44,7 @@ func (tree Tree) insertPath(path []string, data map[string]interface{}) ([]opInf
 	return res, nil
 }
 
-func (tree Tree) Insert(data map[string]interface{}) ([]opInfo, error) {
+func (tree Tree) Insert(data map[string]interface{}) ([]OpInfo, error) {
 	return tree.insertPath([]string{}, data)
 }
 

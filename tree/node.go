@@ -1,20 +1,27 @@
 package tree
 
-import "github.com/go-errors/errors"
+import (
+	"github.com/go-errors/errors"
+	"github.com/thoas/go-funk"
+)
 
+type nodeChildren map[string]*Node
+
+//Node is a node in the tree
 type Node struct {
-	Key string
-	Value []byte
-	Parent *Node
-	Children map[string]*Node
+	Key      string
+	Value    []byte
+	Parent   *Node
+	Children nodeChildren
 }
 
+//NewNode creates a new node in the tree
 func NewNode(key string, parent *Node) *Node {
 	return &Node{
 		key,
 		nil,
 		parent,
-		map[string]*Node{},
+		nodeChildren{},
 	}
 }
 
@@ -22,22 +29,24 @@ func (n *Node) buildPathUpwards() []string {
 	path := []string{n.Key}
 	currentNode := n
 	for {
-		if currentNode.Key == TREE_ROOT {
+		currentNode = currentNode.Parent
+		if currentNode.Key == TREE_ROOT || currentNode.Parent == nil {
 			break
 		}
 
-		p := currentNode.Parent.Key
+		p := currentNode.Key
 		path = append(path, p)
-		currentNode = currentNode.Parent
 	}
 
-	return path
+	return funk.ReverseStrings(path)
 }
 
-func (n *Node) Insert(keys []string, data []byte) (opInfo, error) {
+//Insert inserts a data into a specific key path - e.g. ["foo", "bar"] - "foo" is the same as "foo": { "bar": "foo" }
+//Returns an OpInfo that holds info about the passed operation, if succesful.
+func (n *Node) Insert(keys []string, data []byte) (OpInfo, error) {
 	if len(keys) == 0 {
 		n.Value = data
-		return opInfo{
+		return OpInfo{
 			n.buildPathUpwards(),
 			n.Key,
 			n.Value,
@@ -54,7 +63,8 @@ func (n *Node) Insert(keys []string, data []byte) (opInfo, error) {
 	return newNode.Insert(keys[1:], data)
 }
 
-func (n Node) Get(path[] string) ([]byte, error) {
+//Get gets data from a path
+func (n Node) Get(path []string) ([]byte, error) {
 	if len(path) == 0 {
 		return n.Value, nil
 	}
