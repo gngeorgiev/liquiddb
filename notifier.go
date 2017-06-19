@@ -1,4 +1,4 @@
-package store
+package sstore
 
 import (
 	"sync"
@@ -8,23 +8,23 @@ import (
 )
 
 type Notifier interface {
-	Notify(c chan<- Notification, op ...Operation)
+	Notify(c chan<- OpInfo, op ...Operation)
 }
 
 type notifier struct {
 	sync.Mutex
-	handlers    map[Operation][]chan<- Notification
-	handlersMap map[chan<- Notification][]Operation
+	handlers    map[Operation][]chan<- OpInfo
+	handlersMap map[chan<- OpInfo][]Operation
 }
 
 func newNotifier() *notifier {
 	return &notifier{
-		handlers:    make(map[Operation][]chan<- Notification),
-		handlersMap: make(map[chan<- Notification][]Operation),
+		handlers:    make(map[Operation][]chan<- OpInfo),
+		handlersMap: make(map[chan<- OpInfo][]Operation),
 	}
 }
 
-func (n *notifier) Notify(c chan<- Notification, operations ...Operation) error {
+func (n *notifier) Notify(c chan<- OpInfo, operations ...Operation) error {
 	if c == nil {
 		return errors.New("Invalid channel - nil")
 	}
@@ -34,11 +34,11 @@ func (n *notifier) Notify(c chan<- Notification, operations ...Operation) error 
 
 	for _, op := range operations {
 		if _, ok := n.handlers[op]; !ok {
-			n.handlers[op] = make([]chan<- Notification, 2)
+			n.handlers[op] = make([]chan<- OpInfo, 0)
 		}
 
 		if _, ok := n.handlersMap[c]; !ok {
-			n.handlersMap[c] = make([]Operation, 2)
+			n.handlersMap[c] = make([]Operation, 0)
 		}
 
 		n.handlers[op] = append(n.handlers[op], c)
@@ -48,7 +48,7 @@ func (n *notifier) Notify(c chan<- Notification, operations ...Operation) error 
 	return nil
 }
 
-func (n *notifier) StopNotify(c chan<- Notification) error {
+func (n *notifier) StopNotify(c chan<- OpInfo) error {
 	if c == nil {
 		return errors.New("Invalid channel - nil")
 	}
@@ -69,12 +69,12 @@ func (n *notifier) StopNotify(c chan<- Notification) error {
 	return nil
 }
 
-func (n *notifier) notifyInternal(notitifcations ...Notification) {
+func (n *notifier) notifyInternal(notitifcations ...OpInfo) {
 	n.Lock()
 	defer n.Unlock()
 
 	for _, notf := range notitifcations {
-		for _, c := range n.handlers[notf.Operation()] {
+		for _, c := range n.handlers[notf.Operation] {
 			//send to the channel without blocking
 			select {
 			case c <- notf:
