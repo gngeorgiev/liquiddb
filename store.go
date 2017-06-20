@@ -30,12 +30,12 @@ func (store Store) Set(data map[string]interface{}) ([]OpInfo, error) {
 }
 
 //Get gets a value out of the store by a path formed by an array of strings
-func (store Store) Get(path []string) ([]byte, error) {
+func (store Store) Get(path []string) (interface{}, error) {
 	return store.tree.Get(path)
 }
 
 //GetByString gets a value out of the store by a path formed by a string with dots
-func (store Store) GetByString(path string) ([]byte, error) {
+func (store Store) GetByString(path string) (interface{}, error) {
 	return store.tree.Get(strings.Split(path, "."))
 }
 

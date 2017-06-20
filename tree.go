@@ -16,7 +16,28 @@ var (
 
 type normalizedData struct {
 	key   []string
-	value []byte
+	value interface{}
+}
+
+//Node is a node in the tree
+type Node struct {
+	Key      string
+	Value    interface{}
+	Parent   *Node
+	Children map[string]*Node
+
+	pristine bool
+}
+
+//newNode creates a new node in the tree
+func newNode(key string, parent *Node) *Node {
+	return &Node{
+		key,
+		nil,
+		parent,
+		map[string]*Node{},
+		true,
+	}
 }
 
 type Tree struct {
@@ -29,14 +50,15 @@ func newTree() *Tree {
 	}
 }
 
-func (tree Tree) normalize(data map[string]interface{}) ([]*normalizedData, error) {
-	res := make([]*normalizedData, 0)
+func (tree Tree) normalize(data map[string]interface{}) ([]normalizedData, error) {
+	res := make([]normalizedData, 0)
 
 	var n func(interface{}, []string) error
 	n = func(value interface{}, path []string) error {
+		//TODO: handle more types, e.g. arrays
 		switch v := value.(type) {
-		case []byte:
-			res = append(res, &normalizedData{path, v})
+		case []byte, string, int, int16, int32, int64, int8, float32, float64, bool:
+			res = append(res, normalizedData{path, v})
 		case map[string]interface{}:
 			for k, v := range v {
 				n(v, append(path, k))
@@ -80,7 +102,7 @@ func (tree Tree) findNode(path []string, autoCreate bool) *Node {
 	return node
 }
 
-func (tree Tree) performOnNodes(data []*normalizedData, f func(*normalizedData, *Node) OpInfo) []OpInfo {
+func (tree Tree) performOnNodes(data []normalizedData, f func(normalizedData, *Node) OpInfo) []OpInfo {
 	ops := make([]OpInfo, 0) //TODO: optimize
 
 	for _, d := range data {
@@ -93,7 +115,7 @@ func (tree Tree) performOnNodes(data []*normalizedData, f func(*normalizedData, 
 	return ops
 }
 
-func (tree Tree) do(data map[string]interface{}, f func(*normalizedData, *Node) OpInfo) ([]OpInfo, error) {
+func (tree Tree) do(data map[string]interface{}, f func(normalizedData, *Node) OpInfo) ([]OpInfo, error) {
 	normalizedData, err := tree.normalize(data)
 	if err != nil {
 		return nil, err
@@ -103,7 +125,7 @@ func (tree Tree) do(data map[string]interface{}, f func(*normalizedData, *Node) 
 }
 
 func (tree Tree) Set(data map[string]interface{}) ([]OpInfo, error) {
-	return tree.do(data, func(d *normalizedData, n *Node) OpInfo {
+	return tree.do(data, func(d normalizedData, n *Node) OpInfo {
 		var op Operation
 		if n.pristine {
 			op = OperationInsert
@@ -139,7 +161,12 @@ func (tree Tree) Delete(path []string) (OpInfo, bool) {
 	}, true
 }
 
-func (tree Tree) Get(path []string) ([]byte, error) {
+func (tree Tree) Get(path []string) (interface{}, error) {
+	//TODO: if path is empty, return the whole json data,
+	//this will come when a json model is kept in parallel with the tree
+	//and probably around the time persistance is done
+
+	//TODO: GetInt, GetString etc
 	node := tree.findNode(path, false)
 	if node == nil {
 		return nil, NotFoundErr

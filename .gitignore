@@ -2,3 +2,9 @@ vendor/**
 debug.test
 .idea/**
 .vscode/**
+cmd/sstore/debug
+
+driver/javascript/.fusebox/**
+driver/javascript/node_modules/**
+driver/javascript/test.html
+driver/javascript/dist/**
