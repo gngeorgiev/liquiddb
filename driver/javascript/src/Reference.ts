@@ -15,6 +15,7 @@ export class Reference {
             path = path.split('.');
         }
 
+        //TODO: add safeguard for empty paths, since emty paths can delete the whole tree
         this.path = path;
         this.socket = socket;
     }
