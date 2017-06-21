@@ -1,17 +1,17 @@
-const { FuseBox } = require('fuse-box');
+const { FuseBox, Sparky } = require('fuse-box');
 
-const envs = ['browser', 'node'];
+const args = process.argv.slice(3);
 
-envs.forEach(e => {
+Sparky.task('build-browser', () => {
     const fuse = FuseBox.init({
         sourceMaps: true,
         globals: {
             default: 'LiquidDb'
         },
         homeDir: 'src',
-        output: `dist/$name.${e}.js`
+        output: `dist/browser/$name.js`
     });
 
-    fuse.bundle('liquiddb').instructions(`>index.${e}.ts`).watch();
+    fuse.bundle('liquiddb').instructions(`>index.browser.ts`).watch();
     fuse.run();
 });
