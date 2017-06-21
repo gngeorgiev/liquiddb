@@ -1,3 +1,3 @@
 import { LiquidDb } from './LiquidDb';
 
-export = LiquidDb({ WebSocket });
+export = LiquidDb({ webSocket: WebSocket });

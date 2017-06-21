@@ -4,6 +4,7 @@ export const ClientOperationDelete = 'delete';
 export type ClientOperation = 'set' | 'get' | 'delete';
 
 export interface ClientData {
+    id?: number;
     operation: ClientOperation;
     path?: string[];
     value?: any;

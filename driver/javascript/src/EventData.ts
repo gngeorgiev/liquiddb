@@ -5,6 +5,7 @@ export const EventOperationGet = 'get';
 export type EventOperation = 'insert' | 'delete' | 'update' | 'get';
 
 export interface EventData {
+    id?: number;
     operation: EventOperation;
     path: string[];
     key: string;

@@ -1,5 +1,12 @@
 import { Socket } from './Socket';
-import { EventData, EventOperationGet } from './EventData';
+import {
+    EventData,
+    EventOperation,
+    EventOperationGet,
+    EventOperationInsert,
+    EventOperationUpdate,
+    EventOperationDelete
+} from './EventData';
 import {
     ClientOperationSet,
     ClientOperationDelete,
@@ -15,52 +22,83 @@ export class Reference {
             path = path.split('.');
         }
 
-        //TODO: add safeguard for empty paths, since emty paths can delete the whole tree
+        if (!path || !path.length) {
+            throw new Error('Cannot create a reference with empty path.');
+        }
+
         this.path = path;
         this.socket = socket;
     }
 
     value(): Promise<any> {
-        //connect this with the TODO in the server for ids per message
         return new Promise(resolve => {
-            const removeListener = this.socket.subscribe(
-                this.path,
-                EventOperationGet,
-                (data: EventData) => {
-                    removeListener();
-                    resolve(data.value);
-                }
-            );
-
-            this.socket.send({
+            const id = this.socket.send({
                 operation: ClientOperationGet,
                 path: this.path
             });
+
+            const off = this.socket.subscribe(
+                this.path,
+                EventOperationGet,
+                id,
+                (data: EventData) => {
+                    off();
+                    resolve(data.value);
+                }
+            );
         });
     }
 
-    on(ev: string, callback: (data: EventData) => any): () => any {
-        return this.socket.subscribe(this.path, null, callback);
+    data(callback: (data: EventData) => any): () => any {
+        const offCallbacks = [
+            this.on(EventOperationInsert, callback),
+            this.on(EventOperationUpdate, callback),
+            this.on(EventOperationDelete, callback)
+        ];
+
+        return () => offCallbacks.forEach(f => f());
     }
 
-    //TODO: we need to allow chaining set/value, this means that messages should get
-    //a meaningful response
-    set(value: any): Promise<any> {
-        this.socket.send({
-            operation: ClientOperationSet,
-            path: this.path,
-            value: value
-        });
-
-        return Promise.resolve(); //TODO: response!!
+    on(op: EventOperation, callback: (data: EventData) => any): () => any {
+        return this.socket.subscribe(this.path, op, 0, callback);
     }
 
-    delete(): Promise<any> {
-        this.socket.send({
-            operation: ClientOperationDelete,
-            path: this.path
-        });
+    set(value: any): Promise<EventData> {
+        return new Promise(resolve => {
+            const id = this.socket.send({
+                operation: ClientOperationSet,
+                path: this.path,
+                value: value
+            });
 
-        return Promise.resolve(); //TODO: response!!
+            const off = this.socket.subscribe(
+                this.path,
+                [EventOperationInsert, EventOperationUpdate],
+                id,
+                data => {
+                    off();
+                    resolve(data);
+                }
+            );
+        });
+    }
+
+    delete(): Promise<EventData> {
+        return new Promise(resolve => {
+            const id = this.socket.send({
+                operation: ClientOperationDelete,
+                path: this.path
+            });
+
+            const off = this.socket.subscribe(
+                this.path,
+                EventOperationDelete,
+                id,
+                data => {
+                    off();
+                    resolve(data);
+                }
+            );
+        });
     }
 }

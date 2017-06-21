@@ -1,9 +1,12 @@
 import { EventEmitter } from 'events';
+import * as MersenneTwister from 'mersenne-twister';
+
 import { EventData, EventOperation } from './EventData';
 import { ClientData } from './ClientData';
 
 export class Socket extends EventEmitter {
     private isReady: boolean;
+    private generator: MersenneTwister;
 
     private ws: WebSocket;
 
@@ -14,13 +17,14 @@ export class Socket extends EventEmitter {
     constructor(private address: string, websocket: typeof WebSocket) {
         super();
 
+        this.generator = new MersenneTwister();
         this.initWebSocket(websocket);
     }
 
-    private initWebSocket(websocket: typeof WebSocket) {
+    private initWebSocket(webSocket: typeof WebSocket) {
         this.isReady = false;
 
-        this.ws = new websocket(this.address);
+        this.ws = new webSocket(this.address);
         this.ws.onclose = this.onSocketClose.bind(this);
         this.ws.onerror = this.onSocketError.bind(this);
         this.ws.onopen = this.onSocketOpen.bind(this);
@@ -37,37 +41,41 @@ export class Socket extends EventEmitter {
     }
 
     private onSocketMessage(msg: MessageEvent) {
-        this.emit('message', JSON.parse(msg.data));
+        const data: EventData = JSON.parse(msg.data);
+        const ev = this.buildEventPath(data.path, data.operation, data.id);
+        this.emit(ev, data);
     }
 
     private reconnect() {}
 
-    send(data: ClientData): this {
-        this.ws.send(JSON.stringify(data));
-        return this;
+    private buildEventPath(path: string[], op: EventOperation, id: number) {
+        const parts = [op || null, id ? String(id) : null].filter(a => a);
+        return ['message'].concat(path).concat(parts).join('.');
     }
 
+    send(data: ClientData): number {
+        data.id = this.generator.random_int();
+        this.ws.send(JSON.stringify(data));
+        return data.id;
+    }
+
+    //TODO: subscribeOnce, since a lot of methods need to subscribe only once
     subscribe(
         path: string[],
-        operation: EventOperation,
+        operations: EventOperation | EventOperation[],
+        id: number,
         callback: (data: EventData) => any
     ): () => any {
-        const messageCallback = (data: EventData) => {
-            const isSamePath =
-                data.path && path.every((el, i) => el === data.path[i]);
-            if (!isSamePath) {
-                return;
-            }
+        if (!Array.isArray(operations)) {
+            operations = [operations];
+        }
 
-            if (operation === null) {
-                return callback(data);
-            } else if (operation === data.operation) {
-                return callback(data);
-            }
-        };
+        const events = operations.map(op => {
+            const ev = this.buildEventPath(path, op, id);
+            this.on(ev, callback);
+            return ev;
+        });
 
-        this.on('message', messageCallback);
-
-        return () => this.removeListener('message', messageCallback);
+        return () => events.forEach(ev => this.removeListener(ev, callback));
     }
 }
