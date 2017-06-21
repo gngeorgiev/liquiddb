@@ -17,36 +17,21 @@ export class Reference {
     private path: string[];
     private socket: Socket;
 
-    constructor(path: string | string[], socket: Socket) {
-        if (typeof path === 'string') {
-            path = path.split('.');
-        }
-
-        if (!path || !path.length) {
-            throw new Error('Cannot create a reference with empty path.');
-        }
-
+    constructor(path: string[], socket: Socket) {
         this.path = path;
         this.socket = socket;
     }
 
-    value(): Promise<any> {
-        return new Promise(resolve => {
-            const id = this.socket.send({
+    async value(): Promise<any> {
+        const data = await this.socket.sendWait(
+            {
                 operation: ClientOperationGet,
                 path: this.path
-            });
-
-            const off = this.socket.subscribe(
-                this.path,
-                EventOperationGet,
-                id,
-                (data: EventData) => {
-                    off();
-                    resolve(data.value);
-                }
-            );
-        });
+            },
+            this.path,
+            EventOperationGet
+        );
+        return data.value;
     }
 
     data(callback: (data: EventData) => any): () => any {
@@ -59,46 +44,34 @@ export class Reference {
         return () => offCallbacks.forEach(f => f());
     }
 
+    //TODO: once etc
     on(op: EventOperation, callback: (data: EventData) => any): () => any {
         return this.socket.subscribe(this.path, op, 0, callback);
     }
 
-    set(value: any): Promise<EventData> {
-        return new Promise(resolve => {
-            const id = this.socket.send({
+    async set(value: any): Promise<EventData> {
+        const data = await this.socket.sendWait(
+            {
                 operation: ClientOperationSet,
                 path: this.path,
                 value: value
-            });
+            },
+            this.path,
+            [EventOperationInsert, EventOperationUpdate]
+        );
 
-            const off = this.socket.subscribe(
-                this.path,
-                [EventOperationInsert, EventOperationUpdate],
-                id,
-                data => {
-                    off();
-                    resolve(data);
-                }
-            );
-        });
+        return data;
     }
 
-    delete(): Promise<EventData> {
-        return new Promise(resolve => {
-            const id = this.socket.send({
+    async delete(): Promise<EventData> {
+        const data = await this.socket.sendWait(
+            {
                 operation: ClientOperationDelete,
                 path: this.path
-            });
-
-            const off = this.socket.subscribe(
-                this.path,
-                EventOperationDelete,
-                id,
-                data => {
-                    off();
-                    resolve(data);
-                }
-            );
-        });
+            },
+            this.path,
+            EventOperationDelete
+        );
+        return data;
     }
 }

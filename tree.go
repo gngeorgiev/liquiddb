@@ -237,14 +237,30 @@ func (t tree) Get(path []string) (EventData, error) {
 
 	//TODO: GetInt, GetString etc? - not so sure we need them now
 	node := t.findNode(path, false)
-	if node == nil {
-		return EventData{}, ErrNotFound
+
+	var eventPath []string
+	if node != nil {
+		eventPath = node.Path
+	} else {
+		eventPath = path
+	}
+
+	var eventValue interface{}
+	if node != nil {
+		eventValue = node.Value
+	}
+
+	var eventKey string
+	if node != nil {
+		eventKey = node.Key
+	} else {
+		eventKey = path[len(path) - 1]
 	}
 
 	return EventData{
-		Key:       node.Key,
+		Key:       eventKey,
 		Operation: EventOperationGet,
-		Path:      node.Path,
-		Value:     node.Value,
-	}, nil
+		Path:      eventPath,
+		Value:     eventValue,
+	}, nil //TODO: not returning not found, i think its fine
 }

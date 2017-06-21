@@ -20,6 +20,7 @@ func (a App) handleStoreNotify(conn *clientConnection, wg *sync.WaitGroup) {
 	for {
 		//TODO: data must be ordered, is this the case now?
 		op := <-ch
+		log.Printf("Sending data: %+v", op)
 		err := conn.WriteJSON(op)
 		if err != nil {
 			log.Println("write: ", err)
@@ -54,6 +55,8 @@ func (a App) handleClient(conn *clientConnection, wg *sync.WaitGroup) {
 			log.Println("read: ", err)
 			break
 		}
+
+		log.Printf("Received data: %+v", data)
 
 		switch data.Operation {
 		case clientOperationSet:

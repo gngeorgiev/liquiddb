@@ -2,7 +2,7 @@ vendor/**
 debug.test
 .idea/**
 .vscode/**
-cmd/sstore/debug
+cmd/liquiddb/debug
 
 driver/javascript/.fusebox/**
 driver/javascript/node_modules/**

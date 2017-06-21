@@ -1,6 +1,7 @@
 import { Socket } from './Socket';
 import { Reference } from './Reference';
 import { ClientOperationDelete, ClientOperationSet } from './ClientData';
+import { EventData } from './EventData';
 
 export const LiquidDb = ({ webSocket }: { webSocket: typeof WebSocket }) => {
     interface DbSettings {
@@ -29,27 +30,32 @@ export const LiquidDb = ({ webSocket }: { webSocket: typeof WebSocket }) => {
         }
 
         ref(path: string | string[]): Reference {
+            if (!path) {
+                throw new Error(
+                    'Invalid ref path, must be in the format "foo.bar" or ["foo", "bar"].'
+                );
+            }
+
+            if (typeof path === 'string') {
+                path = path.split('.');
+            }
+
+            //we should not create a reference with empty path since it can delete the whole tree
+            if (!path.length) {
+                throw new Error(
+                    'Invalid ref path, must have at least one level.'
+                );
+            }
+
             return new Reference(path, this.socket);
         }
 
-        //these methods might return useful promises in the future
-        delete(path: string[]): Promise<any> {
-            this.socket.send({
-                operation: ClientOperationDelete,
-                path: []
-            });
-
-            return Promise.resolve();
+        delete(path: string[]): Promise<EventData> {
+            return new Reference([], this.socket).delete();
         }
 
-        set(data: any): Promise<any> {
-            this.socket.send({
-                operation: ClientOperationSet,
-                path: [],
-                value: data
-            });
-
-            return Promise.resolve();
+        set(data: any): Promise<EventData> {
+            return new Reference([], this.socket).set(data);
         }
     }
 

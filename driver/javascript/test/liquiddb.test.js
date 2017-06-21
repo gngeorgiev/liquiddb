@@ -29,14 +29,13 @@ describe('crud', () => {
         await db.delete();
     });
 
-    it.only('should set data and get with value', async () => {
+    it('should set data and get with value', async () => {
         const data = await ref.set(5);
         assert(data.value, 5);
         assert(data.operation, 'insert');
 
         const value = await ref.value();
-        assert(data.value, 5);
-        assert(data.operation, 'get');
+        assert(value, 5);
     });
 
     it('should set data', () => {

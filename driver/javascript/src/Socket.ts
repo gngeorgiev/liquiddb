@@ -41,9 +41,15 @@ export class Socket extends EventEmitter {
     }
 
     private onSocketMessage(msg: MessageEvent) {
+        //TODO: make sure that subscribers without id should receive id based messages as well
+        //so far, I think they should
+
         const data: EventData = JSON.parse(msg.data);
-        const ev = this.buildEventPath(data.path, data.operation, data.id);
-        this.emit(ev, data);
+
+        [
+            this.buildEventPath(data.path, data.operation, data.id),
+            this.buildEventPath(data.path, data.operation, 0)
+        ].forEach(ev => this.emit(ev, data));
     }
 
     private reconnect() {}
@@ -53,13 +59,30 @@ export class Socket extends EventEmitter {
         return ['message'].concat(path).concat(parts).join('.');
     }
 
+    sendWait(
+        data: ClientData,
+        path: string[],
+        operations: EventOperation | EventOperation[]
+    ): Promise<EventData> {
+        return new Promise(resolve => {
+            const id = this.generator.random_int();
+
+            const off = this.subscribe(path, operations, id, data => {
+                off();
+                resolve(data);
+            });
+
+            data.id = id;
+            this.send(data);
+        });
+    }
+
     send(data: ClientData): number {
-        data.id = this.generator.random_int();
+        data.id = data.id || this.generator.random_int();
         this.ws.send(JSON.stringify(data));
         return data.id;
     }
 
-    //TODO: subscribeOnce, since a lot of methods need to subscribe only once
     subscribe(
         path: string[],
         operations: EventOperation | EventOperation[],
