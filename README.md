@@ -1,7 +1,7 @@
-# sstore - Stream Store
+# LiquidDb - In-memory JSON database with events
 ## WIP
 
-Is an in-memory store for JSON documents which provides notifications for **insert, update, delete** operations over **WebSockets** or a **Go API**.
+Is an in-memory database for JSON documents which provides notifications for **insert, update, delete, get** operations.
 
 # Goals
 
