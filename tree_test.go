@@ -41,7 +41,7 @@ func TestTree_SetInsert(t *testing.T) {
 
 	op := opInfos[0]
 
-	if op.Key != "bar" || op.Operation != OperationInsert ||
+	if op.Key != "bar" || op.Operation != EventOperationInsert ||
 		!reflect.DeepEqual(op.Path, p) || !reflect.DeepEqual(op.Value, b) {
 		t.Fatalf("Invalid op %+s", op)
 	}
@@ -58,7 +58,7 @@ func TestTree_SetUpdate(t *testing.T) {
 
 	op := opInfos[0]
 
-	if op.Key != "bar" || op.Operation != OperationUpdate ||
+	if op.Key != "bar" || op.Operation != EventOperationUpdate ||
 		!reflect.DeepEqual(op.Path, p) || !reflect.DeepEqual(op.Value, b) {
 		t.Fatalf("Invalid op %+s", op)
 	}
@@ -73,9 +73,11 @@ func TestTree_Delete(t *testing.T) {
 		t.Fatalf("Invalid result after delete, should be true")
 	}
 
-	if op.Operation != OperationDelete || op.Key != "bar" ||
-		!reflect.DeepEqual(op.Path, p) || !reflect.DeepEqual(op.Value, b) {
-		t.Fatalf("Invalid op %+s", op)
+	for _, op := range op {
+		if op.Operation != EventOperationDelete || op.Key != "bar" ||
+			!reflect.DeepEqual(op.Path, p) || !reflect.DeepEqual(op.Value, b) {
+			t.Fatalf("Invalid op %+s", op)
+		}
 	}
 
 	op, ok = tree.Delete(p)
@@ -112,7 +114,7 @@ func TestTree_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(data, b) {
+	if !reflect.DeepEqual(data.Value, b) {
 		t.Fatalf("Invalid data %s", data)
 	}
 }
@@ -121,7 +123,7 @@ func TestTree_GetNonExisting(t *testing.T) {
 	tree := New()
 
 	_, err := tree.Get(p)
-	if err.Error() != NotFoundErr.Error() {
+	if err.Error() != ErrNotFound.Error() {
 		t.Fatal(err)
 	}
 }

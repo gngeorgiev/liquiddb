@@ -7,11 +7,13 @@ import (
 )
 
 const (
+	//TreeRoot is the key of the root node in the tree
 	TreeRoot string = "root"
 )
 
 var (
-	NotFoundErr = errors.New("Not found")
+	//ErrNotFound is returned when the requested path by Get is not found
+	ErrNotFound = errors.New("Not found")
 )
 
 type normalizedData struct {
@@ -24,6 +26,7 @@ type Node struct {
 	Key      string
 	Value    interface{}
 	Parent   *Node
+	Path     []string
 	Children map[string]*Node
 
 	pristine bool
@@ -31,26 +34,35 @@ type Node struct {
 
 //newNode creates a new node in the tree
 func newNode(key string, parent *Node) *Node {
+	var parentPath []string
+	if parent == nil || parent.Key == TreeRoot {
+		parentPath = []string{}
+	} else {
+		parentPath = parent.Path
+	}
+
 	return &Node{
-		key,
-		nil,
-		parent,
-		map[string]*Node{},
-		true,
+		Key:      key,
+		Value:    nil,
+		Parent:   parent,
+		Children: map[string]*Node{},
+		Path:     append(parentPath, key),
+
+		pristine: true,
 	}
 }
 
-type Tree struct {
+type tree struct {
 	Root *Node
 }
 
-func newTree() *Tree {
-	return &Tree{
+func newTree() *tree {
+	return &tree{
 		Root: newNode(TreeRoot, nil),
 	}
 }
 
-func (tree Tree) normalize(data map[string]interface{}, relative []string) ([]normalizedData, error) {
+func (t tree) normalize(data map[string]interface{}, relative []string) ([]normalizedData, error) {
 	res := make([]normalizedData, 0)
 
 	var n func(interface{}, []string) error
@@ -79,8 +91,8 @@ func (tree Tree) normalize(data map[string]interface{}, relative []string) ([]no
 	return res, nil
 }
 
-func (tree Tree) findNode(path []string, autoCreate bool) *Node {
-	node := tree.Root
+func (t tree) findNode(path []string, autoCreate bool) *Node {
+	node := t.Root
 	for {
 		if len(path) == 0 {
 			break
@@ -102,21 +114,21 @@ func (tree Tree) findNode(path []string, autoCreate bool) *Node {
 	return node
 }
 
-func (tree Tree) performOnNodes(data []normalizedData) []OpInfo {
-	ops := make([]OpInfo, 0) //TODO: optimize
+func (t tree) performOnNodes(data []normalizedData) []EventData {
+	ops := make([]EventData, 0) //TODO: optimize
 
 	for _, d := range data {
-		node := tree.findNode(d.key[:], true)
+		node := t.findNode(d.key[:], true)
 		node.Value = d.value
 
-		var op Operation
+		var op EventOperation
 		if node.pristine {
-			op = OperationInsert
+			op = EventOperationInsert
 		} else {
-			op = OperationUpdate
+			op = EventOperationUpdate
 		}
 
-		info := OpInfo{
+		info := EventData{
 			Key:       node.Key,
 			Operation: op,
 			Path:      d.key,
@@ -130,32 +142,32 @@ func (tree Tree) performOnNodes(data []normalizedData) []OpInfo {
 	return ops
 }
 
-func (tree Tree) do(data map[string]interface{}, relative []string) ([]OpInfo, error) {
-	normalizedData, err := tree.normalize(data, relative)
+func (t tree) do(data map[string]interface{}, relative []string) ([]EventData, error) {
+	normalizedData, err := t.normalize(data, relative)
 	if err != nil {
 		return nil, err
 	}
 
-	return tree.performOnNodes(normalizedData), nil
+	return t.performOnNodes(normalizedData), nil
 }
 
-func (tree Tree) Set(data map[string]interface{}) ([]OpInfo, error) {
-	return tree.do(data, []string{})
+func (t tree) Set(data map[string]interface{}) ([]EventData, error) {
+	return t.do(data, []string{})
 }
 
-func (tree Tree) setTreePathData(path []string, data interface{}) (OpInfo, error) {
-	node := tree.findNode(path, true)
-	var op Operation
+func (t tree) setTreePathData(path []string, data interface{}) (EventData, error) {
+	node := t.findNode(path, true)
+	var op EventOperation
 	if node.pristine {
-		op = OperationInsert
+		op = EventOperationInsert
 	} else {
-		op = OperationUpdate
+		op = EventOperationUpdate
 	}
 
 	node.Value = data
 	node.pristine = false
 
-	return OpInfo{
+	return EventData{
 		Key:       node.Key,
 		Operation: op,
 		Path:      path,
@@ -163,32 +175,30 @@ func (tree Tree) setTreePathData(path []string, data interface{}) (OpInfo, error
 	}, nil
 }
 
-func (tree Tree) setTreeNestedData(path []string, data map[string]interface{}) ([]OpInfo, error) {
-	return tree.do(data, path)
-}
-
-func (tree Tree) SetPath(path []string, data interface{}) ([]OpInfo, error) {
+func (t tree) SetPath(path []string, data interface{}) ([]EventData, error) {
 	switch d := data.(type) {
 	case map[string]interface{}:
-		return tree.setTreeNestedData(path, d)
+		return t.do(d, path)
 	default:
-		op, err := tree.setTreePathData(path, data)
+		op, err := t.setTreePathData(path, data)
 		if err != nil {
 			return nil, err
 		}
 
-		return []OpInfo{op}, nil
+		return []EventData{op}, nil
 	}
 }
 
-func (tree Tree) Delete(path []string) (OpInfo, bool) {
-	node := tree.findNode(path, false)
+func (t tree) Delete(path []string) ([]EventData, bool) {
+	node := t.findNode(path, false)
 	if node == nil {
-		return OpInfo{}, false
+		return nil, false
 	}
 
 	key := node.Key
 	val := node.Value
+
+	eventData := make([]EventData, 0) //TODO: optimize size
 
 	var deleteNodeDescendants func(node *Node)
 	deleteNodeDescendants = func(node *Node) {
@@ -196,32 +206,45 @@ func (tree Tree) Delete(path []string) (OpInfo, bool) {
 			deleteNodeDescendants(n)
 		}
 
+		eventData = append(eventData, EventData{
+			Key:       node.Key,
+			Operation: EventOperationDelete,
+			Path:      node.Path,
+			Value:     node.Value,
+		})
+
 		if node.Parent != nil { //probably root
 			delete(node.Parent.Children, node.Key)
 		}
+
 		node.Value = nil
 		node.Parent = nil
 	}
 	deleteNodeDescendants(node)
 
-	return OpInfo{
+	return append(eventData, EventData{
 		Key:       key,
-		Operation: OperationDelete,
+		Operation: EventOperationDelete,
 		Path:      path,
 		Value:     val,
-	}, true
+	}), true
 }
 
-func (tree Tree) Get(path []string) (interface{}, error) {
+func (t tree) Get(path []string) (EventData, error) {
 	//TODO: if path is empty, return the whole json data,
 	//this will come when a json model is kept in parallel with the tree
 	//and probably around the time persistance is done
 
-	//TODO: GetInt, GetString etc
-	node := tree.findNode(path, false)
+	//TODO: GetInt, GetString etc? - not so sure we need them now
+	node := t.findNode(path, false)
 	if node == nil {
-		return nil, NotFoundErr
+		return EventData{}, ErrNotFound
 	}
 
-	return node.Value, nil
+	return EventData{
+		Key:       node.Key,
+		Operation: EventOperationGet,
+		Path:      node.Path,
+		Value:     node.Value,
+	}, nil
 }

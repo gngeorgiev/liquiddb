@@ -7,24 +7,37 @@ import (
 	"github.com/thoas/go-funk"
 )
 
-type Notifier interface {
-	Notify(c chan<- OpInfo, op ...Operation)
+type EventOperation string
+
+const (
+	EventOperationInsert = EventOperation("insert")
+	EventOperationDelete = EventOperation("delete")
+	EventOperationUpdate = EventOperation("update")
+	EventOperationGet    = EventOperation("get")
+)
+
+type EventData struct {
+	ID        uint64         `json:"id,omitempty"`
+	Operation EventOperation `json:"operation,omitempty"`
+	Path      []string       `json:"path,omitempty"`
+	Key       string         `json:"key,omitempty"`
+	Value     interface{}    `json:"value,omitempty"`
 }
 
 type notifier struct {
 	sync.Mutex
-	handlers    map[Operation][]chan<- OpInfo
-	handlersMap map[chan<- OpInfo][]Operation
+	handlers    map[EventOperation][]chan<- EventData
+	handlersMap map[chan<- EventData][]EventOperation
 }
 
 func newNotifier() *notifier {
 	return &notifier{
-		handlers:    make(map[Operation][]chan<- OpInfo),
-		handlersMap: make(map[chan<- OpInfo][]Operation),
+		handlers:    make(map[EventOperation][]chan<- EventData),
+		handlersMap: make(map[chan<- EventData][]EventOperation),
 	}
 }
 
-func (n *notifier) Notify(c chan<- OpInfo, operations ...Operation) error {
+func (n *notifier) Notify(c chan<- EventData, operations ...EventOperation) error {
 	if c == nil {
 		return errors.New("Invalid channel - nil")
 	}
@@ -34,11 +47,11 @@ func (n *notifier) Notify(c chan<- OpInfo, operations ...Operation) error {
 
 	for _, op := range operations {
 		if _, ok := n.handlers[op]; !ok {
-			n.handlers[op] = make([]chan<- OpInfo, 0)
+			n.handlers[op] = make([]chan<- EventData, 0)
 		}
 
 		if _, ok := n.handlersMap[c]; !ok {
-			n.handlersMap[c] = make([]Operation, 0)
+			n.handlersMap[c] = make([]EventOperation, 0)
 		}
 
 		n.handlers[op] = append(n.handlers[op], c)
@@ -48,7 +61,7 @@ func (n *notifier) Notify(c chan<- OpInfo, operations ...Operation) error {
 	return nil
 }
 
-func (n *notifier) StopNotify(c chan<- OpInfo) error {
+func (n *notifier) StopNotify(c chan<- EventData) error {
 	if c == nil {
 		return errors.New("Invalid channel - nil")
 	}
@@ -69,7 +82,7 @@ func (n *notifier) StopNotify(c chan<- OpInfo) error {
 	return nil
 }
 
-func (n *notifier) notifyInternal(notitifcations ...OpInfo) {
+func (n *notifier) notifyInternal(notitifcations ...EventData) {
 	n.Lock()
 	defer n.Unlock()
 
