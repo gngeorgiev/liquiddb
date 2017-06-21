@@ -27,7 +27,7 @@ export class Reference {
                 EventOperationGet,
                 (data: EventData) => {
                     removeListener();
-                    resolve(data);
+                    resolve(data.value);
                 }
             );
 

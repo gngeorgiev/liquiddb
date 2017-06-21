@@ -11,16 +11,16 @@ export class Socket extends EventEmitter {
         return this.isReady;
     }
 
-    constructor(private address: string) {
+    constructor(private address: string, websocket: typeof WebSocket) {
         super();
 
-        this.initWebSocket();
+        this.initWebSocket(websocket);
     }
 
-    private initWebSocket() {
+    private initWebSocket(websocket: typeof WebSocket) {
         this.isReady = false;
 
-        this.ws = new WebSocket(this.address);
+        this.ws = new websocket(this.address);
         this.ws.onclose = this.onSocketClose.bind(this);
         this.ws.onerror = this.onSocketError.bind(this);
         this.ws.onopen = this.onSocketOpen.bind(this);
@@ -43,19 +43,7 @@ export class Socket extends EventEmitter {
     private reconnect() {}
 
     send(data: ClientData): this {
-        //TODO: ugly! I think we should change the store api
-        const obj = {};
-        var currentObj = obj;
-        data.path.slice(0, data.path.length - 1).forEach(p => {
-            currentObj[p] = {};
-            currentObj = currentObj[p];
-        });
-
-        currentObj[data.path[data.path.length - 1]] = data.value;
-        data.value = obj;
-
         this.ws.send(JSON.stringify(data));
-
         return this;
     }
 
@@ -65,7 +53,8 @@ export class Socket extends EventEmitter {
         callback: (data: EventData) => any
     ): () => any {
         const messageCallback = (data: EventData) => {
-            const isSamePath = path.every((el, i) => el === data.path[i]);
+            const isSamePath =
+                data.path && path.every((el, i) => el === data.path[i]);
             if (!isSamePath) {
                 return;
             }

@@ -1,19 +1,22 @@
 {
-  "name": "sstore-javascript-driver",
+  "name": "liquiddb-javascript-driver",
   "version": "0.0.1",
   "description": "",
   "main": "dist/store.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha test/"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "assert": "^1.4.1",
     "fuse-box": "^2.1.0",
+    "mocha": "^3.4.2",
     "typescript": "^2.3.4"
   },
   "dependencies": {
     "@types/node": "^8.0.0",
-    "events": "^1.1.1"
+    "events": "^1.1.1",
+    "html5-websocket": "^1.0.0"
   }
 }

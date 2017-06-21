@@ -1,13 +1,17 @@
 const { FuseBox } = require('fuse-box');
 
-const fuse = FuseBox.init({
-    sourceMaps: true,
-    globals: {
-        default: 'SStore'
-    },
-    homeDir: 'src',
-    output: 'dist/$name.js'
-});
-fuse.bundle('sstore').instructions(`>index.ts`).watch();
+const envs = ['browser', 'node'];
 
-fuse.run();
+envs.forEach(e => {
+    const fuse = FuseBox.init({
+        sourceMaps: true,
+        globals: {
+            default: 'LiquidDb'
+        },
+        homeDir: 'src',
+        output: `dist/$name.${e}.js`
+    });
+
+    fuse.bundle('liquiddb').instructions(`>index.${e}.ts`).watch();
+    fuse.run();
+});
