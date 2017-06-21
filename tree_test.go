@@ -1,4 +1,4 @@
-package sstore
+package liquiddb
 
 import (
 	"reflect"
@@ -81,6 +81,25 @@ func TestTree_Delete(t *testing.T) {
 	op, ok = tree.Delete(p)
 	if ok {
 		t.Fatalf("Invalid result after delete, should be false")
+	}
+}
+
+func TestTree_DeleteAll(t *testing.T) {
+	tree := newTree()
+
+	tree.Set(data)
+
+	node := tree.Root.Children["foo"]
+
+	tree.Delete([]string{})
+
+	children := len(tree.Root.Children)
+	if children > 0 {
+		t.Fatal("Invalid amount of children")
+	}
+
+	if node.Parent != nil || node.Value != nil {
+		t.Fatal("Node is not deleted properly")
 	}
 }
 

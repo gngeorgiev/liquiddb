@@ -1,4 +1,4 @@
-package sstore
+package liquiddb
 
 import (
 	"fmt"

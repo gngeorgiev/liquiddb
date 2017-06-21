@@ -1,4 +1,4 @@
-package sstore
+package liquiddb
 
 import (
 	"strings"
@@ -21,6 +21,17 @@ func New() *Store {
 //Set inserts a json in the store
 func (store Store) Set(data map[string]interface{}) ([]OpInfo, error) {
 	op, err := store.tree.Set(data)
+	if err != nil {
+		return nil, err
+	}
+
+	store.notifyInternal(op...)
+	return op, nil
+}
+
+func (store Store) SetPath(path []string, data interface{}) ([]OpInfo, error) {
+	//TODO: test
+	op, err := store.tree.SetPath(path, data)
 	if err != nil {
 		return nil, err
 	}

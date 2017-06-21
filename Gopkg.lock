@@ -8,10 +8,10 @@
   revision = "8fa88b06e5974e97fbf9899a7f86a344bfd1f105"
 
 [[projects]]
-  branch = "master"
   name = "github.com/gorilla/websocket"
   packages = ["."]
-  revision = "a91eba7f97777409bc2c443f5534d41dd20c5720"
+  revision = "3ab3a8b8831546bd18fd182c20687ca853b2bb13"
+  version = "v1.1.0"
 
 [[projects]]
   name = "github.com/thoas/go-funk"
@@ -22,6 +22,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "83faeca635b3663e3867cfd894ce1221b7ac4621517fb49d1235096bd0090450"
+  inputs-digest = "78ebbf423d982323e36dc49109ae1743f3c71db94160243385c84bf7dd0f0c64"
   solver-name = "gps-cdcl"
   solver-version = 1

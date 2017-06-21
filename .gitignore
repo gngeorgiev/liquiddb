@@ -8,3 +8,4 @@ driver/javascript/.fusebox/**
 driver/javascript/node_modules/**
 driver/javascript/test.html
 driver/javascript/dist/**
+driver/javascript/.vscode/**

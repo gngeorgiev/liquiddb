@@ -1,4 +1,4 @@
-package sstore
+package liquiddb
 
 import (
 	"fmt"
@@ -50,7 +50,7 @@ func newTree() *Tree {
 	}
 }
 
-func (tree Tree) normalize(data map[string]interface{}) ([]normalizedData, error) {
+func (tree Tree) normalize(data map[string]interface{}, relative []string) ([]normalizedData, error) {
 	res := make([]normalizedData, 0)
 
 	var n func(interface{}, []string) error
@@ -71,7 +71,7 @@ func (tree Tree) normalize(data map[string]interface{}) ([]normalizedData, error
 	}
 
 	for k, v := range data {
-		if err := n(v, []string{k}); err != nil {
+		if err := n(v, append(relative, k)); err != nil {
 			return nil, err
 		}
 	}
@@ -102,44 +102,83 @@ func (tree Tree) findNode(path []string, autoCreate bool) *Node {
 	return node
 }
 
-func (tree Tree) performOnNodes(data []normalizedData, f func(normalizedData, *Node) OpInfo) []OpInfo {
+func (tree Tree) performOnNodes(data []normalizedData) []OpInfo {
 	ops := make([]OpInfo, 0) //TODO: optimize
 
 	for _, d := range data {
 		node := tree.findNode(d.key[:], true)
 		node.Value = d.value
-		ops = append(ops, f(d, node))
+
+		var op Operation
+		if node.pristine {
+			op = OperationInsert
+		} else {
+			op = OperationUpdate
+		}
+
+		info := OpInfo{
+			Key:       node.Key,
+			Operation: op,
+			Path:      d.key,
+			Value:     d.value,
+		}
+
+		ops = append(ops, info)
 		node.pristine = false
 	}
 
 	return ops
 }
 
-func (tree Tree) do(data map[string]interface{}, f func(normalizedData, *Node) OpInfo) ([]OpInfo, error) {
-	normalizedData, err := tree.normalize(data)
+func (tree Tree) do(data map[string]interface{}, relative []string) ([]OpInfo, error) {
+	normalizedData, err := tree.normalize(data, relative)
 	if err != nil {
 		return nil, err
 	}
 
-	return tree.performOnNodes(normalizedData, f), nil
+	return tree.performOnNodes(normalizedData), nil
 }
 
 func (tree Tree) Set(data map[string]interface{}) ([]OpInfo, error) {
-	return tree.do(data, func(d normalizedData, n *Node) OpInfo {
-		var op Operation
-		if n.pristine {
-			op = OperationInsert
-		} else {
-			op = OperationUpdate
+	return tree.do(data, []string{})
+}
+
+func (tree Tree) setTreePathData(path []string, data interface{}) (OpInfo, error) {
+	node := tree.findNode(path, true)
+	var op Operation
+	if node.pristine {
+		op = OperationInsert
+	} else {
+		op = OperationUpdate
+	}
+
+	node.Value = data
+	node.pristine = false
+
+	return OpInfo{
+		Key:       node.Key,
+		Operation: op,
+		Path:      path,
+		Value:     data,
+	}, nil
+}
+
+func (tree Tree) setTreeNestedData(path []string, data map[string]interface{}) ([]OpInfo, error) {
+	return tree.do(data, path)
+}
+
+func (tree Tree) SetPath(path []string, data interface{}) ([]OpInfo, error) {
+	switch d := data.(type) {
+	case map[string]interface{}:
+		return tree.setTreeNestedData(path, d)
+	default:
+		op, err := tree.setTreePathData(path, data)
+		if err != nil {
+			return nil, err
 		}
 
-		return OpInfo{
-			Key:       n.Key,
-			Operation: op,
-			Path:      d.key,
-			Value:     d.value,
-		}
-	})
+		return []OpInfo{op}, nil
+	}
 }
 
 func (tree Tree) Delete(path []string) (OpInfo, bool) {
@@ -148,13 +187,25 @@ func (tree Tree) Delete(path []string) (OpInfo, bool) {
 		return OpInfo{}, false
 	}
 
-	delete(node.Parent.Children, node.Key)
+	key := node.Key
 	val := node.Value
-	node.Value = nil
-	node.Parent = nil
+
+	var deleteNodeDescendants func(node *Node)
+	deleteNodeDescendants = func(node *Node) {
+		for _, n := range node.Children {
+			deleteNodeDescendants(n)
+		}
+
+		if node.Parent != nil { //probably root
+			delete(node.Parent.Children, node.Key)
+		}
+		node.Value = nil
+		node.Parent = nil
+	}
+	deleteNodeDescendants(node)
 
 	return OpInfo{
-		Key:       node.Key,
+		Key:       key,
 		Operation: OperationDelete,
 		Path:      path,
 		Value:     val,
