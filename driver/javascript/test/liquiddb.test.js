@@ -13,6 +13,7 @@ describe('basic', () => {
     it('should initialize properly', async () => {
         const db = await new LiquidDb().initialize();
         assert.equal(db.socket.ready, true);
+        db.socket.close();
     });
 });
 
@@ -25,8 +26,16 @@ describe('crud', () => {
         ref = db.ref('foo');
     });
 
+    after(() => {
+        db.socket.close();
+    });
+
     afterEach(async () => {
         await db.delete();
+    });
+
+    it('should set data and get with value', async () => {
+        const data = await ref.set(5);
     });
 
     it('should set data and get with value', async () => {
@@ -40,9 +49,8 @@ describe('crud', () => {
 
     it('should set data', () => {
         return new Promise(resolve => {
-            const off = ref.on('insert', d => {
+            ref.once('insert', d => {
                 assert.equal(d.value, 'test');
-                off();
                 resolve();
             });
 
@@ -52,9 +60,8 @@ describe('crud', () => {
 
     it('should set json and get correctly', () => {
         return new Promise(async resolve => {
-            const off = db.ref('foo.bar').on('insert', data => {
+            db.ref('foo.bar').once('insert', data => {
                 assert.equal(data.value, 5);
-                off();
                 resolve();
             });
 
@@ -71,16 +78,15 @@ describe('crud', () => {
             });
 
             setTimeout(() => {
-                const off = db.ref('foo.bar').on('delete', async d => {
+                db.ref('foo.bar').once('delete', async d => {
                     assert.equal(d.value, 5);
                     const val = await db.ref('foo.bar').value();
                     assert.equal(undefined, val);
-                    off();
                     resolve();
                 });
 
                 db.delete();
-            }, 100);
+            }, 15);
         });
     });
 
@@ -92,13 +98,35 @@ describe('crud', () => {
                 }
             });
 
-            const off = db.ref(['foo', 'bar']).on('insert', async d => {
+            db.ref(['foo', 'bar']).once('insert', async d => {
                 assert.equal(d.value, 5);
                 const value = await db.ref('foo.bar').value();
                 assert.equal(value, 5);
-                off();
                 resolve();
             });
         });
+    });
+});
+
+describe('multiple connected sockets', () => {
+    const dbs = [];
+
+    before(async () => {
+        dbs.push(await new LiquidDb().initialize());
+        dbs.push(await new LiquidDb().initialize());
+        dbs.push(await new LiquidDb().initialize());
+    });
+
+    after(() => {
+        dbs.forEach(db => db.socket.close());
+    });
+
+    it.only('should set data and get with value', async () => {
+        const data = await dbs[0].ref('foo.bar').set(5);
+        assert(data.value, 5);
+        assert(data.operation, 'insert');
+
+        const value = await dbs[2].ref('foo.bar').value();
+        assert(value, 5);
     });
 });

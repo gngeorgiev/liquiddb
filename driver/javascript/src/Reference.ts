@@ -44,9 +44,12 @@ export class Reference {
         return () => offCallbacks.forEach(f => f());
     }
 
-    //TODO: once etc
     on(op: EventOperation, callback: (data: EventData) => any): () => any {
         return this.socket.subscribe(this.path, op, 0, callback);
+    }
+
+    once(op: EventOperation, callback: (data: EventData) => any) {
+        this.socket.subscribeOnce(this.path, op, 0, callback);
     }
 
     async set(value: any): Promise<EventData> {
