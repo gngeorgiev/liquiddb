@@ -11,20 +11,24 @@ import (
 )
 
 //TODO: Use protocol buffers!
-func (a App) handleStoreNotify(conn *clientConnection, wg *sync.WaitGroup) {
-	defer wg.Done()
-
+func (a App) handleStoreNotify(conn *clientConnection, stop chan struct{}) {
 	ch := make(chan liquiddb.EventData)
 	a.db.Notify(ch, liquiddb.EventOperationDelete, liquiddb.EventOperationInsert,
 		liquiddb.EventOperationUpdate, liquiddb.EventOperationGet)
 	for {
 		//TODO: data must be ordered, is this the case now?
-		op := <-ch
-		log.Printf("Sending data: %+v", op)
-		err := conn.WriteJSON(op)
-		if err != nil {
-			log.Println("write: ", err)
-			break
+		select {
+		case op := <-ch:
+			log.Printf("Sending data: %+v", op)
+			err := conn.WriteJSON(op)
+			if err != nil {
+				log.Println("write: ", err)
+				close(stop)
+				break
+			}
+		case <-stop:
+			a.db.StopNotify(ch)
+			return
 		}
 	}
 }
@@ -44,32 +48,35 @@ type clientData struct {
 	Value     interface{}     `json:"value,omitempty"`
 }
 
-func (a App) handleClient(conn *clientConnection, wg *sync.WaitGroup) {
-	defer wg.Done()
-
+func (a App) handleClient(conn *clientConnection, stop chan struct{}) {
 	for {
-		var data clientData
-		err := conn.ReadJSON(&data)
-		if err != nil {
-			//TODO: try to write one last error to the ws connection before closing it
-			log.Println("read: ", err)
-			break
-		}
-
-		log.Printf("Received data: %+v", data)
-
-		switch data.Operation {
-		case clientOperationSet:
-			a.db.Link(data.ID).SetPath(data.Path, data.Value)
-		case clientOperationDelete:
-			a.db.Link(data.ID).Delete(data.Path)
-		case clientOperationGet:
-			a.db.Link(data.ID).Get(data.Path)
+		select {
+		case <-stop:
+			return
 		default:
-			//TODO: should we and how to notify the user about this
-			log.Println("read: ", fmt.Errorf("Invalid operation type: %s", data.Operation))
-		}
+			var data clientData
+			err := conn.ReadJSON(&data)
+			if err != nil {
+				//TODO: try to write one last error to the ws connection before closing it
+				log.Println("read: ", err)
+				close(stop);
+				break
+			}
 
+			log.Printf("Received data: %+v", data)
+
+			switch data.Operation {
+			case clientOperationSet:
+				a.db.Link(data.ID).SetPath(data.Path, data.Value)
+			case clientOperationDelete:
+				a.db.Link(data.ID).Delete(data.Path)
+			case clientOperationGet:
+				a.db.Link(data.ID).Get(data.Path)
+			default:
+				//TODO: should we and how to notify the user about this
+				log.Println("read: ", fmt.Errorf("Invalid operation type: %s", data.Operation))
+			}
+		}
 	}
 }
 
@@ -116,13 +123,12 @@ func (a App) startServer() error {
 
 		defer conn.ws.Close()
 
-		var wg sync.WaitGroup
-		wg.Add(2)
+		close := make(chan struct{})
 
-		go a.handleStoreNotify(conn, &wg)
-		go a.handleClient(conn, &wg)
+		go a.handleStoreNotify(conn, close)
+		go a.handleClient(conn, close)
 
-		wg.Wait()
+		<-close
 	}
 
 	http.HandleFunc("/db", handler)
