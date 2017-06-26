@@ -8,6 +8,7 @@
         "typeRoots": [
             "node_modules/@types"
         ],
+        "downlevelIteration": true,
         "target": "es5"
     }
 }

@@ -2,15 +2,17 @@ import { EventEmitter } from 'events';
 import * as MersenneTwister from 'mersenne-twister';
 
 import { EventData, EventOperation } from './EventData';
-import { ClientData } from './ClientData';
+import { SocketEvent } from './SocketEvent';
+import {
+    ClientData,
+    ClientOperationSubscribe,
+    ClientOperationUnSubscribe
+} from './ClientData';
 
 export class Socket extends EventEmitter {
     private isReady: boolean;
     private generator: MersenneTwister;
-    //there are messages with empty paths, e.g. delete on the whole tree
-    //which need to be acknoledged since the response from the server
-    //returns the deleted nodes and the event cannot be matched otherwise
-    private emptyPathsMap: Map<number, boolean>;
+    private events: Map<number, SocketEvent>;
 
     private ws: WebSocket;
 
@@ -22,7 +24,8 @@ export class Socket extends EventEmitter {
         super();
 
         this.generator = new MersenneTwister();
-        this.emptyPathsMap = new Map();
+        this.events = new Map();
+
         this.initWebSocket(websocket);
     }
 
@@ -55,11 +58,6 @@ export class Socket extends EventEmitter {
             this.buildEventPath(data.path, data.operation, 0),
             this.buildEventPath(data.path, data.operation, data.id)
         ];
-        //some id-based subscriptions have specific paths, that are not the same as the
-        //response.
-        if (this.emptyPathsMap.has(data.id)) {
-            events.push(this.buildEventPath([], data.operation, data.id));
-        }
 
         events.forEach(ev => this.emit(ev, data));
     }
@@ -68,22 +66,57 @@ export class Socket extends EventEmitter {
 
     private buildEventPath(path: string[], op: EventOperation, id: number) {
         const parts = [op || null, id ? String(id) : null].filter(a => a);
-        return ['message'].concat(path).concat(parts).join('.');
+        return path.concat(parts).join('.');
     }
 
-    private unsubscribe(
-        ev: string,
+    private unsubscribeImpl(socketEvent: SocketEvent) {
+        const { path, event, operation, id, callback } = socketEvent;
+
+        this.removeListener(event, callback);
+        this.send({
+            id,
+            path,
+            operation: ClientOperationUnSubscribe,
+            value: operation
+        });
+
+        this.events.delete(id);
+    }
+
+    private subscribeImp(
+        path: string[],
+        op: EventOperation,
         callback: (data: EventData) => any,
-        id?: number
-    ) {
-        if (id) {
-            this.emptyPathsMap.delete(id);
-        }
-        this.removeListener(ev, callback);
+        id: number
+    ): SocketEvent {
+        const evPath = this.buildEventPath(path, op, id);
+        this.on(evPath, callback);
+
+        this.send({
+            path,
+            id: id,
+            operation: ClientOperationSubscribe,
+            value: op
+        });
+
+        const event = {
+            event: evPath,
+            path,
+            operation: op,
+            callback,
+            id
+        };
+
+        this.events.set(id, event);
+
+        return event;
     }
 
     close() {
         this.ws.close();
+        for (let [id, event] of this.events.entries()) {
+            this.unsubscribeImpl(event);
+        }
     }
 
     sendWait(
@@ -92,9 +125,12 @@ export class Socket extends EventEmitter {
         operations: EventOperation | EventOperation[]
     ): Promise<EventData> {
         return new Promise(resolve => {
+            //we need to save the id, so we are generating it manually
             const id = this.generator.random_int();
 
-            this.subscribeOnce(path, operations, id, resolve);
+            this.subscribeOnce(path, operations, id, data => {
+                resolve(data);
+            });
 
             data.id = id;
             this.send(data);
@@ -114,8 +150,8 @@ export class Socket extends EventEmitter {
         callback: (data: EventData) => any
     ) {
         const off = this.subscribe(path, operations, id, data => {
+            off();
             callback(data);
-            return off();
         });
     }
 
@@ -123,26 +159,20 @@ export class Socket extends EventEmitter {
         path: string[],
         operations: EventOperation | EventOperation[],
         id: number,
-        callback: (data: EventData) => any
+        callback: (data: EventData) => any,
+        once?: boolean
     ): () => any {
         if (!Array.isArray(operations)) {
             operations = [operations];
         }
 
-        //avoid having empty event names
-        if (!path.length && operations.length === 1) {
-            if (id) {
-                this.emptyPathsMap.set(id, true);
-            } else {
-                throw new Error(
-                    'Invalid subscription path. Provide either path or id.'
-                );
-            }
-        }
+        const events = operations.map(op =>
+            this.subscribeImp(path, op, callback, id)
+        );
 
-        const events = operations.map(op => this.buildEventPath(path, op, id));
-        events.forEach(ev => this.on(ev, callback));
-
-        return () => events.forEach(ev => this.unsubscribe(ev, callback, id));
+        return () =>
+            events.forEach(ev => {
+                this.unsubscribeImpl(ev);
+            });
     }
 }

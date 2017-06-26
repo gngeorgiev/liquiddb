@@ -29,6 +29,10 @@ export const LiquidDb = ({ webSocket }: { webSocket: typeof WebSocket }) => {
             });
         }
 
+        close() {
+            this.socket.close();
+        }
+
         ref(path: string | string[]): Reference {
             if (!path) {
                 throw new Error(
@@ -51,11 +55,11 @@ export const LiquidDb = ({ webSocket }: { webSocket: typeof WebSocket }) => {
         }
 
         delete(path: string[]): Promise<EventData> {
-            return new Reference([], this.socket).delete();
+            return new Reference(['root'], this.socket).delete();
         }
 
         set(data: any): Promise<EventData> {
-            return new Reference([], this.socket).set(data);
+            return new Reference(['root'], this.socket).set(data);
         }
     }
 
