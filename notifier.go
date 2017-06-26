@@ -88,11 +88,7 @@ func (n *notifier) notifyInternal(notitifcations ...EventData) {
 
 	for _, notf := range notitifcations {
 		for _, c := range n.handlers[notf.Operation] {
-			//send to the channel without blocking
-			select {
-			case c <- notf:
-			default:
-			}
+			c <- notf
 		}
 	}
 

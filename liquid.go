@@ -60,6 +60,7 @@ func (db LiquidDb) SetPath(path []string, data interface{}) ([]EventData, error)
 
 //Get gets a value out of the store by a path formed by an array of strings
 func (db LiquidDb) Get(path []string) (EventData, error) {
+	//TODO: return json if the tree continues to stem
 	op, err := db.tree.Get(path)
 	evData := db.linker.link(db.linkID, op)
 	//TODO: Do we want to notify on every get?

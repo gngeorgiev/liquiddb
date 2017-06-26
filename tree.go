@@ -92,6 +92,10 @@ func (t tree) normalize(data map[string]interface{}, relative []string) ([]norma
 }
 
 func (t tree) findNode(path []string, autoCreate bool) *Node {
+	if len(path) == 1 && path[0] == TreeRoot {
+		return t.Root
+	}
+
 	node := t.Root
 	for {
 		if len(path) == 0 {
@@ -118,25 +122,29 @@ func (t tree) performOnNodes(data []normalizedData) []EventData {
 	ops := make([]EventData, 0) //TODO: optimize
 
 	for _, d := range data {
-		node := t.findNode(d.key[:], true)
-		node.Value = d.value
+		for i := range d.key {
+			node := t.findNode(d.key[:i+1], true)
+			if node.Key == d.key[len(d.key)-1] {
+				node.Value = d.value
+			}
 
-		var op EventOperation
-		if node.pristine {
-			op = EventOperationInsert
-		} else {
-			op = EventOperationUpdate
+			var op EventOperation
+			if node.pristine && node.Key != TreeRoot {
+				op = EventOperationInsert
+			} else {
+				op = EventOperationUpdate
+			}
+
+			info := EventData{
+				Key:       node.Key,
+				Operation: op,
+				Path:      node.Path,
+				Value:     node.Value,
+			}
+
+			ops = append(ops, info)
+			node.pristine = false
 		}
-
-		info := EventData{
-			Key:       node.Key,
-			Operation: op,
-			Path:      d.key,
-			Value:     d.value,
-		}
-
-		ops = append(ops, info)
-		node.pristine = false
 	}
 
 	return ops
@@ -195,9 +203,6 @@ func (t tree) Delete(path []string) ([]EventData, bool) {
 		return nil, false
 	}
 
-	key := node.Key
-	val := node.Value
-
 	eventData := make([]EventData, 0) //TODO: optimize size
 
 	var deleteNodeDescendants func(node *Node)
@@ -222,12 +227,7 @@ func (t tree) Delete(path []string) ([]EventData, bool) {
 	}
 	deleteNodeDescendants(node)
 
-	return append(eventData, EventData{
-		Key:       key,
-		Operation: EventOperationDelete,
-		Path:      path,
-		Value:     val,
-	}), true
+	return eventData, true
 }
 
 func (t tree) Get(path []string) (EventData, error) {
@@ -254,7 +254,7 @@ func (t tree) Get(path []string) (EventData, error) {
 	if node != nil {
 		eventKey = node.Key
 	} else {
-		eventKey = path[len(path) - 1]
+		eventKey = path[len(path)-1]
 	}
 
 	return EventData{
