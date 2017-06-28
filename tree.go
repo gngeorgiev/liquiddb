@@ -1,8 +1,6 @@
 package liquiddb
 
 import (
-	"fmt"
-
 	"github.com/Jeffail/gabs"
 	"github.com/go-errors/errors"
 )
@@ -78,16 +76,14 @@ func (t tree) normalize(data map[string]interface{}, relative []string) ([]norma
 
 	var n func(interface{}, []string) error
 	n = func(value interface{}, path []string) error {
-		//TODO: handle more types, e.g. arrays
 		switch v := value.(type) {
-		case []byte, string, int, int16, int32, int64, int8, float32, float64, bool:
-			res = append(res, normalizedData{path, v})
 		case map[string]interface{}:
 			for k, v := range v {
 				n(v, append(path, k))
 			}
 		default:
-			return fmt.Errorf("Invalid datatype %s", v)
+			//[]byte, string, int, int16, int32, int64, int8, float32, float64, bool, []interface{}
+			res = append(res, normalizedData{path, v})
 		}
 
 		return nil
@@ -304,11 +300,6 @@ func (t tree) Delete(path []string) ([]EventData, bool) {
 }
 
 func (t tree) Get(path []string) (EventData, error) {
-	//TODO: if path is empty, return the whole json data,
-	//this will come when a json model is kept in parallel with the tree
-	//and probably around the time persistance is done
-
-	//TODO: GetInt, GetString etc? - not so sure we need them now
 	node := t.findNode(path, false)
 
 	var eventPath []string
