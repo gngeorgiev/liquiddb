@@ -97,6 +97,10 @@ func (t tree) findNode(path []string, autoCreate bool) *Node {
 	}
 
 	node := t.Root
+	if len(path) > 0 && path[0] == TreeRoot {
+		path = path[1:]
+	}
+
 	for {
 		if len(path) == 0 {
 			break
