@@ -130,6 +130,17 @@ describe('crud', () => {
             }
         });
     });
+
+    it('should insert and get array', async () => {
+        const arr = [1, 'pesho', 3];
+
+        await db.ref('foo').set(arr);
+        const val = await db.ref('foo').value();
+
+        assert.equal(arr[0], val[0]);
+        assert.equal(arr[1], val[1]);
+        assert.equal(arr[2], val[2]);
+    });
 });
 
 describe('multiple connected sockets', () => {
