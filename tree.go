@@ -3,6 +3,7 @@ package liquiddb
 import (
 	"fmt"
 
+	"github.com/Jeffail/gabs"
 	"github.com/go-errors/errors"
 )
 
@@ -41,7 +42,7 @@ func newNode(key string, parent *Node) *Node {
 		parentPath = parent.Path
 	}
 
-	return &Node{
+	node := &Node{
 		Key:      key,
 		Value:    nil,
 		Parent:   parent,
@@ -50,15 +51,25 @@ func newNode(key string, parent *Node) *Node {
 
 		pristine: true,
 	}
+
+	if parent != nil {
+		parent.Children[node.Key] = node
+		parent.Value = nil
+	}
+
+	return node
 }
 
 type tree struct {
-	Root *Node
+	root *Node
+	//in the future json will be used for persistence
+	json *gabs.Container
 }
 
 func newTree() *tree {
 	return &tree{
-		Root: newNode(TreeRoot, nil),
+		root: newNode(TreeRoot, nil),
+		json: gabs.New(),
 	}
 }
 
@@ -93,10 +104,10 @@ func (t tree) normalize(data map[string]interface{}, relative []string) ([]norma
 
 func (t tree) findNode(path []string, autoCreate bool) *Node {
 	if len(path) == 1 && path[0] == TreeRoot {
-		return t.Root
+		return t.root
 	}
 
-	node := t.Root
+	node := t.root
 	if len(path) > 0 && path[0] == TreeRoot {
 		path = path[1:]
 	}
@@ -110,7 +121,7 @@ func (t tree) findNode(path []string, autoCreate bool) *Node {
 		path = path[1:]
 		if _, ok := node.Children[key]; !ok {
 			if autoCreate {
-				node.Children[key] = newNode(key, node)
+				newNode(key, node)
 			} else {
 				return nil
 			}
@@ -164,7 +175,13 @@ func (t tree) do(data map[string]interface{}, relative []string) ([]EventData, e
 }
 
 func (t tree) Set(data map[string]interface{}) ([]EventData, error) {
-	return t.do(data, []string{})
+	ops, err := t.do(data, []string{})
+	if err != nil {
+		return nil, err
+	}
+
+	t.updateJSON(ops)
+	return ops, nil
 }
 
 func (t tree) setTreePathData(path []string, data interface{}) (EventData, error) {
@@ -187,17 +204,74 @@ func (t tree) setTreePathData(path []string, data interface{}) (EventData, error
 	}, nil
 }
 
+func (t tree) updateJSON(data []EventData) {
+	maxLen := 0
+	maxLenData := make([]EventData, 0)
+
+	for _, d := range data {
+		l := len(d.Path)
+		if l > maxLen {
+			maxLen = l
+			maxLenData = maxLenData[:0]
+			maxLenData = append(maxLenData, d)
+		} else if l == maxLen {
+			maxLenData = append(maxLenData, d)
+		}
+	}
+
+	for _, d := range maxLenData {
+		switch d.Operation {
+		case EventOperationInsert, EventOperationUpdate:
+			//we need to set the value of each key in the json downwards to an empty json object
+			//so the library can assign it a proper value at the end
+			for i := range d.Path {
+				if i == len(d.Path)-1 {
+					break
+				}
+
+				pathSoFar := d.Path[:i+1]
+				if _, ok := t.json.Search(pathSoFar...).Data().(map[string]interface{}); !ok {
+					t.json.Set(map[string]interface{}{}, pathSoFar...)
+				}
+			}
+
+			t.json.Set(d.Value, d.Path...)
+		case EventOperationDelete:
+			t.json.Delete(d.Path...)
+		}
+	}
+}
+
 func (t tree) SetPath(path []string, data interface{}) ([]EventData, error) {
+	var ops []EventData
+
 	switch d := data.(type) {
 	case map[string]interface{}:
-		return t.do(d, path)
+		o, err := t.do(d, path)
+		if err != nil {
+			return nil, err
+		}
+
+		ops = o
 	default:
 		op, err := t.setTreePathData(path, data)
 		if err != nil {
 			return nil, err
 		}
 
-		return []EventData{op}, nil
+		ops = []EventData{op}
+	}
+
+	t.updateJSON(ops)
+
+	return ops, nil
+}
+
+func (t tree) iterateDescendants(node *Node, f func(node *Node)) {
+	f(node)
+	for _, n := range node.Children {
+		f(n)
+		t.iterateDescendants(n, f)
 	}
 }
 
@@ -209,12 +283,7 @@ func (t tree) Delete(path []string) ([]EventData, bool) {
 
 	eventData := make([]EventData, 0) //TODO: optimize size
 
-	var deleteNodeDescendants func(node *Node)
-	deleteNodeDescendants = func(node *Node) {
-		for _, n := range node.Children {
-			deleteNodeDescendants(n)
-		}
-
+	t.iterateDescendants(node, func(node *Node) {
 		eventData = append(eventData, EventData{
 			Key:       node.Key,
 			Operation: EventOperationDelete,
@@ -228,9 +297,9 @@ func (t tree) Delete(path []string) ([]EventData, bool) {
 
 		node.Value = nil
 		node.Parent = nil
-	}
-	deleteNodeDescendants(node)
+	})
 
+	t.updateJSON(eventData)
 	return eventData, true
 }
 
@@ -252,6 +321,10 @@ func (t tree) Get(path []string) (EventData, error) {
 	var eventValue interface{}
 	if node != nil {
 		eventValue = node.Value
+	}
+
+	if eventValue == nil {
+		eventValue = t.json.Search(path...).Data()
 	}
 
 	var eventKey string

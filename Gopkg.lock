@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  name = "github.com/Jeffail/gabs"
+  packages = ["."]
+  revision = "2a3aa15961d5fee6047b8151b67ac2f08ba2c48c"
+  version = "1.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/go-errors/errors"
   packages = ["."]
@@ -22,6 +28,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "78ebbf423d982323e36dc49109ae1743f3c71db94160243385c84bf7dd0f0c64"
+  inputs-digest = "b120d6c8f3d35c2ddf1373c5a2c932b7d2630fcf0f5b3eafabb25ea1f66aca1a"
   solver-name = "gps-cdcl"
   solver-version = 1

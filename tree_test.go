@@ -8,7 +8,7 @@ import (
 func TestNewNode(t *testing.T) {
 	n := newNode(TreeRoot, &Node{
 		Key:      "ParentTest",
-		Children: nil,
+		Children: map[string]*Node{},
 		Parent:   nil,
 		pristine: false,
 		Value:    nil,
@@ -26,8 +26,8 @@ func TestNewNode(t *testing.T) {
 func TestNew(t *testing.T) {
 	tree := newTree()
 
-	if tree.Root.Key != TreeRoot {
-		t.Fatalf("Invalid tree root %s", tree.Root.Key)
+	if tree.root.Key != TreeRoot {
+		t.Fatalf("Invalid tree root %s", tree.root.Key)
 	}
 }
 
@@ -91,11 +91,11 @@ func TestTree_DeleteAll(t *testing.T) {
 
 	tree.Set(data)
 
-	node := tree.Root.Children["foo"]
+	node := tree.root.Children["foo"]
 
 	tree.Delete([]string{})
 
-	children := len(tree.Root.Children)
+	children := len(tree.root.Children)
 	if children > 0 {
 		t.Fatal("Invalid amount of children")
 	}
@@ -125,5 +125,26 @@ func TestTree_GetNonExisting(t *testing.T) {
 	v, _ := tree.Get(p)
 	if v.Value != nil {
 		t.Fatal("Wrong non existing value")
+	}
+}
+
+func TestTree_GetJson(t *testing.T) {
+	tree := New()
+	//settings another value fist, to make sure we are overriding it correctly
+	tree.Set(map[string]interface{}{
+		"foo": true,
+	})
+
+	tree.Set(data)
+
+	data, err := tree.Get([]string{"foo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(data.Value, map[string]interface{}{
+		"bar": []byte("foobar"),
+	}) {
+		t.Fatal("Incorrect json value")
 	}
 }
