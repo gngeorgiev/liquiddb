@@ -33,23 +33,30 @@ func TestNotify(t *testing.T) {
 				go func() {
 					defer wg.Done()
 
-					notf := <-c
+					var valid bool
+					for {
+						select {
+						case notf := <-c:
+							if notf.Operation == op && notf.Key == "bar" {
+								if !reflect.DeepEqual(notf.Value, b) {
+									t.Errorf("Invalid value, %s", notf.Value)
+								}
 
-					if notf.Operation != op {
-						t.Errorf("Invalid operation, %s", notf.Operation)
+								if !reflect.DeepEqual(notf.Path, []string{"foo", "bar"}) {
+									t.Errorf("Invalid path, %s", notf.Path)
+								}
+
+								valid = true
+							}
+						default:
+							if !valid {
+								t.Error("Invalid notification")
+							}
+
+							return
+						}
 					}
 
-					if notf.Key != "bar" {
-						t.Errorf("Invalid key, %s", notf.Key)
-					}
-
-					if !reflect.DeepEqual(notf.Value, b) {
-						t.Errorf("Invalid value, %s", notf.Value)
-					}
-
-					if !reflect.DeepEqual(notf.Path, []string{"foo", "bar"}) {
-						t.Errorf("Invalid path, %s", notf.Path)
-					}
 				}()
 
 				switch op {
@@ -85,10 +92,17 @@ func TestStopNotify(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		notf := <-ch
-		if notf.Operation != EventOperationInsert {
-			t.Fatalf("Invalid operation %s", notf.Operation)
+		for {
+			select {
+			case notf := <-ch:
+				if notf.Operation != EventOperationInsert {
+					t.Fatalf("Invalid operation %s", notf.Operation)
+				}
+			default:
+				return
+			}
 		}
+
 	}()
 	store.Set(data)
 
@@ -101,7 +115,7 @@ func TestStopNotify(t *testing.T) {
 
 		select {
 		case notf := <-ch:
-			t.Fatalf("Should not receive notification %+s", notf)
+			t.Fatalf("Should not receive notification %+v", notf)
 		case <-timer:
 		}
 	}()

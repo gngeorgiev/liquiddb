@@ -39,7 +39,7 @@ func TestTree_SetInsert(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	op := opInfos[0]
+	op := opInfos[1]
 
 	if op.Key != "bar" || op.Operation != EventOperationInsert ||
 		!reflect.DeepEqual(op.Path, p) || !reflect.DeepEqual(op.Value, b) {
@@ -56,7 +56,7 @@ func TestTree_SetUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	op := opInfos[0]
+	op := opInfos[1]
 
 	if op.Key != "bar" || op.Operation != EventOperationUpdate ||
 		!reflect.DeepEqual(op.Path, p) || !reflect.DeepEqual(op.Value, b) {
@@ -122,8 +122,8 @@ func TestTree_Get(t *testing.T) {
 func TestTree_GetNonExisting(t *testing.T) {
 	tree := New()
 
-	_, err := tree.Get(p)
-	if err.Error() != ErrNotFound.Error() {
-		t.Fatal(err)
+	v, _ := tree.Get(p)
+	if v.Value != nil {
+		t.Fatal("Wrong non existing value")
 	}
 }

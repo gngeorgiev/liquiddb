@@ -95,7 +95,6 @@ describe('crud', () => {
     });
 
     it('should set to whole tree', () => {
-        //TODO: bug
         return new Promise(async resolve => {
             const ref = db.ref(['foo', 'bar']);
             ref.once('insert', async d => {
