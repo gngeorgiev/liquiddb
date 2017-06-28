@@ -78,35 +78,34 @@ describe('crud', () => {
     });
 
     it('should delete all data', () => {
-        return new Promise(resolve => {
-            ref.set({
+        return new Promise(async resolve => {
+            await ref.set({
                 bar: 5
             });
 
-            setTimeout(() => {
-                db.ref('foo.bar').once('delete', async d => {
-                    assert.equal(d.value, 5);
-                    const val = await db.ref('foo.bar').value();
-                    assert.equal(undefined, val);
-                    resolve();
-                });
+            db.ref('foo.bar').once('delete', async d => {
+                assert.equal(d.value, 5);
+                const val = await db.ref('foo.bar').value();
+                assert.equal(undefined, val);
+                resolve();
+            });
 
-                db.delete();
-            }, 15);
+            await db.delete();
         });
     });
 
-    it.skip('should set to whole tree', () => {
+    it('should set to whole tree', () => {
         //TODO: bug
         return new Promise(async resolve => {
-            db.ref(['foo', 'bar']).once('insert', async d => {
+            const ref = db.ref(['foo', 'bar']);
+            ref.once('insert', async d => {
                 assert.equal(d.value, 5);
-                const value = await db.ref('foo.bar').value();
+                const value = await ref.value();
                 assert.equal(value, 5);
                 resolve();
             });
 
-            db.set({
+            await db.set({
                 foo: {
                     bar: 5
                 }
