@@ -111,6 +111,25 @@ describe('crud', () => {
             });
         });
     });
+
+    it('should get json', async () => {
+        await db.ref('foo').set('test1');
+
+        await db.set({
+            foo: {
+                bar: {
+                    test: true
+                }
+            }
+        });
+
+        const val = await db.ref('foo').value();
+        assert.deepEqual(val, {
+            bar: {
+                test: true
+            }
+        });
+    });
 });
 
 describe('multiple connected sockets', () => {
