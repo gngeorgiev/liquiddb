@@ -1,14 +1,10 @@
 {
     "compilerOptions": {
         "sourceMap": true,
-        "lib": [
-            "es2017",
-            "dom"
-        ],
-        "typeRoots": [
-            "node_modules/@types"
-        ],
+        "lib": ["es2017", "dom"],
+        "typeRoots": ["node_modules/@types"],
         "downlevelIteration": true,
-        "target": "es5"
+        "target": "es5",
+        "declaration": true
     }
 }

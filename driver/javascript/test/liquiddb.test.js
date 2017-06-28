@@ -1,5 +1,5 @@
 const assert = require('assert');
-const LiquidDb = require('../dist/node/index.node');
+const { LiquidDb } = require('../dist/node/index.node');
 
 describe('basic', () => {
     it('should create with proper settings', () => {

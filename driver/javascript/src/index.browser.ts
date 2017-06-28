@@ -1,3 +1,4 @@
 import { LiquidDb } from './LiquidDb';
+LiquidDb.initializeShims({ webSocket: WebSocket });
 
-export = LiquidDb({ webSocket: WebSocket });
+export * from './LiquidDb';
