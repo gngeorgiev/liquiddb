@@ -19,7 +19,7 @@ func TestNewNode(t *testing.T) {
 	}
 
 	if n.Parent == nil || n.Parent.Key != "ParentTest" {
-		t.Fatalf("Invalid parent %s", n.Parent)
+		t.Fatalf("Invalid parent %+v", n.Parent)
 	}
 }
 
@@ -43,7 +43,7 @@ func TestTree_SetInsert(t *testing.T) {
 
 	if op.Key != "bar" || op.Operation != EventOperationInsert ||
 		!reflect.DeepEqual(op.Path, p) || !reflect.DeepEqual(op.Value, b) {
-		t.Fatalf("Invalid op %+s", op)
+		t.Fatalf("Invalid op %+v", op)
 	}
 }
 
@@ -60,7 +60,7 @@ func TestTree_SetUpdate(t *testing.T) {
 
 	if op.Key != "bar" || op.Operation != EventOperationUpdate ||
 		!reflect.DeepEqual(op.Path, p) || !reflect.DeepEqual(op.Value, b) {
-		t.Fatalf("Invalid op %+s", op)
+		t.Fatalf("Invalid op %+v", op)
 	}
 }
 
@@ -76,7 +76,7 @@ func TestTree_Delete(t *testing.T) {
 	for _, op := range op {
 		if op.Operation != EventOperationDelete || op.Key != "bar" ||
 			!reflect.DeepEqual(op.Path, p) || !reflect.DeepEqual(op.Value, b) {
-			t.Fatalf("Invalid op %+s", op)
+			t.Fatalf("Invalid op %+v", op)
 		}
 	}
 
@@ -115,7 +115,7 @@ func TestTree_Get(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(data.Value, b) {
-		t.Fatalf("Invalid data %s", data)
+		t.Fatalf("Invalid data %+v", data)
 	}
 }
 

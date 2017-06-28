@@ -7,15 +7,21 @@ import (
 	"github.com/thoas/go-funk"
 )
 
+//EventOperation is a db operation
 type EventOperation string
 
 const (
+	//EventOperationInsert is an insert db operation
 	EventOperationInsert = EventOperation("insert")
+	//EventOperationDelete is a delete db operation
 	EventOperationDelete = EventOperation("delete")
+	//EventOperationUpdate is an update db operation
 	EventOperationUpdate = EventOperation("update")
-	EventOperationGet    = EventOperation("get")
+	//EventOperationGet is a get db operation
+	EventOperationGet = EventOperation("get")
 )
 
+//EventData is a whole db event holding data and metadata
 type EventData struct {
 	ID        uint64         `json:"id,omitempty"`
 	Operation EventOperation `json:"operation,omitempty"`
