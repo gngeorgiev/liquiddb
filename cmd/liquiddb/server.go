@@ -99,6 +99,18 @@ func (a App) handleClient(conn *clientConnection, stop chan struct{}) {
 	}
 }
 
+type clientConnections struct {
+	connectionAdded   chan *clientConnection
+	connectionRemoved chan *clientConnection
+	connections       []*clientConnection
+}
+
+var conns = clientConnections{
+	make(chan *clientConnection),
+	make(chan *clientConnection),
+	make([]*clientConnection, 0),
+}
+
 type clientConnection struct {
 	mu        sync.Mutex
 	interests map[string][]liquiddb.EventOperation
@@ -106,30 +118,68 @@ type clientConnection struct {
 	ws *websocket.Conn
 }
 
+func (c *clientConnection) close() error {
+	index := funk.IndexOf(conns.connections, c)
+	if index != -1 {
+		conns.connections = append(conns.connections[:index], conns.connections[index+1:]...)
+	}
+
+	conns.connectionRemoved <- c
+
+	return c.ws.Close()
+}
+
 func newClientConnection(ws *websocket.Conn) *clientConnection {
-	return &clientConnection{
+	c := &clientConnection{
 		sync.Mutex{},
 		map[string][]liquiddb.EventOperation{},
 		ws,
 	}
+
+	log.Printf("New Connection: %s", ws.RemoteAddr().String())
+
+	conns.connectionAdded <- c
+	conns.connections = append(conns.connections, c)
+
+	return c
 }
 
-func (c *clientConnection) WriteInterested(path string, op liquiddb.EventOperation, o interface{}) (bool, error) {
+func (c *clientConnection) WriteInterested(path string, op liquiddb.EventOperation, o liquiddb.EventData) (bool, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	//TODO: operations including root should be optimized and cleaned up
 	interests := c.interests[path]
-	if interests == nil || len(interests) == 0 {
-		return false, nil
+	if interests == nil {
+		interests = c.interests[liquiddb.TreeRoot]
+		if interests == nil {
+			return false, nil
+		}
 	}
 
-	for _, interest := range interests {
-		if interest == op {
+	for _, ev := range interests {
+		if ev == op {
 			return true, c.ws.WriteJSON(o)
 		}
 	}
 
 	return false, nil
+}
+
+func (c *clientConnection) AddInterest(interest string, op liquiddb.EventOperation) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if interest == "" {
+		interest = liquiddb.TreeRoot
+	}
+
+	interests := c.interests[interest]
+	if interests == nil {
+		c.interests[interest] = []liquiddb.EventOperation{op}
+	} else {
+		c.interests[interest] = append(interests, op)
+	}
 }
 
 func (c *clientConnection) WriteJSON(o interface{}) error {
@@ -145,21 +195,13 @@ func (c *clientConnection) ReadJSON(o interface{}) error {
 	return c.ws.ReadJSON(o)
 }
 
-func (c *clientConnection) AddInterest(interest string, op liquiddb.EventOperation) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	interests := c.interests[interest]
-	if interests == nil {
-		c.interests[interest] = []liquiddb.EventOperation{op}
-	} else {
-		c.interests[interest] = append(interests, op)
-	}
-}
-
 func (c *clientConnection) RemoveInterest(interest string, op liquiddb.EventOperation) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	if interest == "" {
+		interest = liquiddb.TreeRoot
+	}
 
 	interests := c.interests[interest]
 	if interests == nil || len(interests) == 0 {
@@ -173,13 +215,8 @@ func (c *clientConnection) RemoveInterest(interest string, op liquiddb.EventOper
 	}
 }
 
-func (a App) startServer() error {
-	upgrader := websocket.Upgrader{}
-	upgrader.CheckOrigin = func(r *http.Request) bool {
-		return true
-	}
-
-	handler := func(w http.ResponseWriter, r *http.Request) {
+func (a App) dbHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		ws, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -188,7 +225,7 @@ func (a App) startServer() error {
 
 		conn := newClientConnection(ws)
 
-		defer conn.ws.Close()
+		defer conn.close()
 
 		close := make(chan struct{})
 
@@ -197,7 +234,59 @@ func (a App) startServer() error {
 
 		<-close
 	}
+}
 
-	http.HandleFunc("/db", handler)
+func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, r *http.Request) {
+	connectionsCount := make(chan int)
+
+	go func() {
+		for {
+			select {
+			case <-conns.connectionAdded:
+				select {
+				case connectionsCount <- len(conns.connections):
+				default:
+				}
+			case <-conns.connectionRemoved:
+				select {
+				case connectionsCount <- len(conns.connections):
+				default:
+				}
+			}
+		}
+	}()
+
+	type stats struct {
+		connectionsCount int
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		ws, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		for {
+			select {
+			case c := <-connectionsCount:
+				if err := ws.WriteJSON(stats{c}); err != nil {
+					return
+				}
+			}
+		}
+
+	}
+}
+
+func (a App) startServer() error {
+	upgrader := websocket.Upgrader{}
+	upgrader.CheckOrigin = func(r *http.Request) bool {
+		return true
+	}
+
+	http.HandleFunc("/db", a.dbHandler(upgrader))
+	http.HandleFunc("/stats", a.statsHandler(upgrader))
+
 	return http.ListenAndServe(":8080", nil)
 }

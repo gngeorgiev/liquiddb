@@ -56,8 +56,14 @@ export class Socket extends EventEmitter {
 
         const events = [
             this.buildEventPath(data.path, data.operation, 0),
-            this.buildEventPath(data.path, data.operation, data.id)
+            this.buildEventPath(data.path, data.operation, data.id),
+            this.buildEventPath([], data.operation, 0),
+            this.buildEventPath([], data.operation, data.id)
         ];
+
+        console.log(`
+            Event Data: ${msg.data}
+            Events: ${JSON.stringify(Object.keys((<any>this)._events))}`);
 
         events.forEach(ev => this.emit(ev, data));
     }
@@ -89,6 +95,9 @@ export class Socket extends EventEmitter {
         callback: (data: EventData) => any,
         id: number
     ): SocketEvent {
+        if (!path.length && id) {
+        }
+
         const evPath = this.buildEventPath(path, op, id);
         this.on(evPath, callback);
 

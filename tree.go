@@ -1,6 +1,8 @@
 package liquiddb
 
 import (
+	"log"
+
 	"github.com/Jeffail/gabs"
 	"github.com/go-errors/errors"
 )
@@ -154,6 +156,7 @@ func (t tree) performOnNodes(data []normalizedData) []EventData {
 			}
 
 			ops = append(ops, info)
+
 			node.pristine = false
 		}
 	}
@@ -266,7 +269,6 @@ func (t tree) SetPath(path []string, data interface{}) ([]EventData, error) {
 func (t tree) iterateDescendants(node *Node, f func(node *Node)) {
 	f(node)
 	for _, n := range node.Children {
-		f(n)
 		t.iterateDescendants(n, f)
 	}
 }
@@ -280,6 +282,7 @@ func (t tree) Delete(path []string) ([]EventData, bool) {
 	eventData := make([]EventData, 0) //TODO: optimize size
 
 	t.iterateDescendants(node, func(node *Node) {
+		log.Printf("%+v", node)
 		eventData = append(eventData, EventData{
 			Key:       node.Key,
 			Operation: EventOperationDelete,
@@ -315,7 +318,11 @@ func (t tree) Get(path []string) (EventData, error) {
 	}
 
 	if eventValue == nil {
-		eventValue = t.json.Search(path...).Data()
+		if len(path) == 1 && path[0] == TreeRoot {
+			eventValue = t.json.Data()
+		} else {
+			eventValue = t.json.Search(path...).Data()
+		}
 	}
 
 	var eventKey string

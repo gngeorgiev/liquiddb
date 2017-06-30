@@ -1,7 +1,7 @@
 import { Socket } from './Socket';
 import { Reference } from './Reference';
 import { ClientOperationDelete, ClientOperationSet } from './ClientData';
-import { EventData } from './EventData';
+import { EventData, EventOperation } from './EventData';
 
 export interface DbSettings {
     address?: string;
@@ -64,10 +64,26 @@ export class LiquidDb {
     }
 
     delete(path: string[]): Promise<EventData> {
-        return new Reference(['root'], this.socket).delete();
+        return new Reference([], this.socket).delete();
     }
 
     set(data: any): Promise<EventData> {
-        return new Reference(['root'], this.socket).set(data);
+        return new Reference([], this.socket).set(data);
+    }
+
+    value(): Promise<any> {
+        return new Reference([], this.socket).value();
+    }
+
+    data(callback: (data: EventData) => any): () => any {
+        return new Reference([], this.socket).data(callback);
+    }
+
+    on(op: EventOperation, callback: (data: EventData) => any): () => any {
+        return new Reference([], this.socket).on(op, callback);
+    }
+
+    once(op: EventOperation, callback: (data: EventData) => any) {
+        return new Reference([], this.socket).once(op, callback);
     }
 }

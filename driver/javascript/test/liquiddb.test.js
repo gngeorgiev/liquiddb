@@ -141,6 +141,48 @@ describe('crud', () => {
         assert.equal(arr[1], val[1]);
         assert.equal(arr[2], val[2]);
     });
+
+    describe.only('fda', () => {
+        it('should get whole tree', async () => {
+            const data = {
+                foo: {
+                    bar: {
+                        test: true
+                    }
+                }
+            };
+
+            await db.set(data);
+            const val = await db.value();
+
+            assert.deepEqual(data, val);
+        });
+
+        it('should get notification for whole database', async () => {
+            const data = {
+                test: 1
+            };
+
+            await new Promise(async resolve => {
+                const unsub = db.data(data => {
+                    assert.equal('insert', data.operation);
+                    assert.equal(1, data.value);
+                    unsub();
+                });
+
+                await db.set(data);
+
+                const unnsub1 = db.data(data => {
+                    assert.equal('update', data.operation);
+                    assert.equal('pesho', data.value);
+                    unnsub1();
+                    resolve();
+                });
+
+                await db.ref('test').set('pesho');
+            });
+        });
+    });
 });
 
 describe('multiple connected sockets', () => {
