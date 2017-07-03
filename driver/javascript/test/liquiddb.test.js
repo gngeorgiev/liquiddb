@@ -143,7 +143,35 @@ describe('crud', () => {
     });
 
     describe.only('fda', () => {
-        it('should get whole tree', async () => {
+        it('should get notification for whole database', async () => {
+            const data = {
+                test: 1
+            };
+
+            await new Promise(async resolve => {
+                const unsub = db.data(async data => {
+                    console.log(data);
+                    assert.equal('insert', data.operation);
+                    assert.equal(1, data.value);
+                    unsub();
+
+                    const unnsub1 = db.data(data => {
+                        assert.equal('update', data.operation);
+                        assert.equal('pesho', data.value);
+                        unnsub1();
+                        resolve();
+                    });
+
+                    await db.ref('test').set('pesho');
+                });
+
+                await db.set(data);
+            });
+        });
+
+        it('should get whole tree correctly', async () => {
+            await db.set({ test: 1 });
+
             const data = {
                 foo: {
                     bar: {
@@ -156,31 +184,6 @@ describe('crud', () => {
             const val = await db.value();
 
             assert.deepEqual(data, val);
-        });
-
-        it('should get notification for whole database', async () => {
-            const data = {
-                test: 1
-            };
-
-            await new Promise(async resolve => {
-                const unsub = db.data(data => {
-                    assert.equal('insert', data.operation);
-                    assert.equal(1, data.value);
-                    unsub();
-                });
-
-                await db.set(data);
-
-                const unnsub1 = db.data(data => {
-                    assert.equal('update', data.operation);
-                    assert.equal('pesho', data.value);
-                    unnsub1();
-                    resolve();
-                });
-
-                await db.ref('test').set('pesho');
-            });
         });
     });
 });
