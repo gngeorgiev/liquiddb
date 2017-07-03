@@ -1,6 +1,12 @@
 const assert = require('assert');
 const { LiquidDb } = require('../dist/node/index.node');
 
+const logLevel = process.env.LIQUID_LOG_LEVEL || 'error';
+
+LiquidDb.configureLogger({
+    level: LiquidDb.LogLevel[logLevel]
+});
+
 describe('basic', () => {
     it('should create with proper settings', () => {
         const db = new LiquidDb({ address: 'test' });
@@ -12,7 +18,8 @@ describe('basic', () => {
 
     it('should initialize properly', async () => {
         const db = await new LiquidDb().initialize();
-        assert.equal(db.socket.ready, true);
+        assert.equal(db.socket.socketOpen, true);
+        assert.equal(db.socket.receivedHearthbeat, true);
         db.socket.close();
     });
 });
@@ -142,49 +149,46 @@ describe('crud', () => {
         assert.equal(arr[2], val[2]);
     });
 
-    describe.only('fda', () => {
-        it('should get notification for whole database', async () => {
-            const data = {
-                test: 1
-            };
+    it('should get notification for whole database', async () => {
+        const data = {
+            test: 1
+        };
 
-            await new Promise(async resolve => {
-                const unsub = db.data(async data => {
-                    console.log(data);
-                    assert.equal('insert', data.operation);
-                    assert.equal(1, data.value);
-                    unsub();
+        await new Promise(async resolve => {
+            const unsub = db.data(async data => {
+                assert.equal('insert', data.operation);
+                assert.equal(1, data.value);
+                unsub();
 
-                    const unnsub1 = db.data(data => {
-                        assert.equal('update', data.operation);
-                        assert.equal('pesho', data.value);
-                        unnsub1();
-                        resolve();
-                    });
-
-                    await db.ref('test').set('pesho');
+                const unnsub1 = db.data(data => {
+                    assert.equal('update', data.operation);
+                    assert.equal('pesho', data.value);
+                    unnsub1();
+                    resolve();
                 });
 
-                await db.set(data);
+                await db.ref('test').set('pesho');
             });
-        });
-
-        it('should get whole tree correctly', async () => {
-            await db.set({ test: 1 });
-
-            const data = {
-                foo: {
-                    bar: {
-                        test: true
-                    }
-                }
-            };
 
             await db.set(data);
-            const val = await db.value();
-
-            assert.deepEqual(data, val);
         });
+    });
+
+    it('should get whole tree correctly', async () => {
+        await db.set({ test: 1 });
+
+        const data = {
+            foo: {
+                bar: {
+                    test: true
+                }
+            }
+        };
+
+        await db.set(data);
+        const val = await db.value();
+
+        assert.deepEqual(data, val);
     });
 });
 

@@ -1,6 +1,6 @@
 import { Socket } from './Socket';
 import {
-    EventData,
+    OperationEventData,
     EventOperation,
     EventOperationGet,
     EventOperationInsert,
@@ -34,7 +34,7 @@ export class Reference {
         return data.value;
     }
 
-    data(callback: (data: EventData) => any): () => any {
+    data(callback: (data: OperationEventData) => any): () => any {
         const offCallbacks = [
             this.on(EventOperationInsert, callback),
             this.on(EventOperationUpdate, callback),
@@ -44,15 +44,18 @@ export class Reference {
         return () => offCallbacks.forEach(f => f());
     }
 
-    on(op: EventOperation, callback: (data: EventData) => any): () => any {
+    on(
+        op: EventOperation,
+        callback: (data: OperationEventData) => any
+    ): () => any {
         return this.socket.subscribe(this.path, op, 0, callback);
     }
 
-    once(op: EventOperation, callback: (data: EventData) => any) {
+    once(op: EventOperation, callback: (data: OperationEventData) => any) {
         this.socket.subscribeOnce(this.path, op, 0, callback);
     }
 
-    async set(value: any): Promise<EventData> {
+    async set(value: any): Promise<OperationEventData> {
         const data = await this.socket.sendWait(
             {
                 operation: ClientOperationSet,
@@ -66,7 +69,7 @@ export class Reference {
         return data;
     }
 
-    async delete(): Promise<EventData> {
+    async delete(): Promise<OperationEventData> {
         const data = await this.socket.sendWait(
             {
                 operation: ClientOperationDelete,

@@ -3,6 +3,8 @@ package liquiddb
 import (
 	"sync"
 
+	"time"
+
 	"github.com/go-errors/errors"
 	"github.com/thoas/go-funk"
 )
@@ -28,6 +30,7 @@ type EventData struct {
 	Path      []string       `json:"path,omitempty"`
 	Key       string         `json:"key,omitempty"`
 	Value     interface{}    `json:"value,omitempty"`
+	Timestamp time.Time
 }
 
 type notifier struct {
@@ -88,13 +91,14 @@ func (n *notifier) StopNotify(c chan<- EventData) error {
 	return nil
 }
 
-func (n *notifier) notifyInternal(notitifcations ...EventData) {
+func (n *notifier) notifyInternal(notifications ...EventData) {
 	n.Lock()
 	defer n.Unlock()
 
-	for _, notf := range notitifcations {
-		for _, c := range n.handlers[notf.Operation] {
-			c <- notf
+	for _, notification := range notifications {
+		notification.Timestamp = time.Now().UTC()
+		for _, c := range n.handlers[notification.Operation] {
+			c <- notification
 		}
 	}
 
