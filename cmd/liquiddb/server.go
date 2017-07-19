@@ -421,7 +421,7 @@ func (a App) startServer() error {
 	mux.HandleFunc("/db", a.dbHandler(upgrader))
 	mux.HandleFunc("/stats", a.statsHandler(upgrader))
 
-	handler := cors.Default().Handler(mux)
+	handler := cors.AllowAll().Handler(mux)
 
 	log.Printf("Listening on port %s", serverPort)
 	return http.ListenAndServe(serverPort, handler)

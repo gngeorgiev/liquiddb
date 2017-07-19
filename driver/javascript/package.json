@@ -2,12 +2,12 @@
     "name": "liquiddb-javascript-driver",
     "version": "0.0.2",
     "description": "",
-    "main": "dist/node/index.node",
-    "typings": "dist/node/index.node",
+    "main": "node/index",
+    "typings": "node/index",
     "scripts": {
         "test": "mocha --watch test/",
         "build-browser": "node fuse build-browser",
-        "build-node": "tsc -w --outDir dist/node",
+        "build-node": "tsc -w --outDir node",
         "test-once": "mocha test/"
     },
     "author": "",

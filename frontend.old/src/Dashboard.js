@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import JSONTree from 'react-json-tree';
-import { LiquidDb } from 'liquiddb-javascript-driver/browser';
+const { LiquidDb } = require('liquiddb-javascript-driver/browser');
 
 export class Dashboard extends Component {
     state = {

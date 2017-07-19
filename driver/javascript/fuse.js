@@ -9,9 +9,9 @@ Sparky.task('build-browser', () => {
             default: 'LiquidDb'
         },
         homeDir: 'src',
-        output: `dist/browser/$name.js`
+        output: `browser/$name.js`
     });
 
-    fuse.bundle('liquiddb').instructions(`>index.browser.ts`).watch();
+    fuse.bundle('index').instructions(`>index.browser.ts`).watch();
     fuse.run();
 });
