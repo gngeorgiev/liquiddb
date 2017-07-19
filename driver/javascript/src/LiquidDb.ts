@@ -1,7 +1,8 @@
 import { Socket } from './Socket';
 import { Reference } from './Reference';
 import { ClientOperationDelete, ClientOperationSet } from './ClientData';
-import { EventData } from './EventData';
+import { OperationEventData, EventOperation } from './EventData';
+import { configure, LogLevel } from './log';
 
 export interface DbSettings {
     address?: string;
@@ -17,13 +18,19 @@ export class LiquidDb {
 
     constructor(
         private settings: DbSettings = {
-            address: 'ws://localhost:8080/db'
+            address: 'ws://localhost:8082/db'
         }
     ) {}
 
     static initializeShims(shims: Shims) {
         LiquidDb.shims = shims;
     }
+
+    static configureLogger(conf: { level: LogLevel }) {
+        configure(conf);
+    }
+
+    static LogLevel: typeof LogLevel = LogLevel;
 
     initialize(): Promise<LiquidDb> {
         this.socket = new Socket(
@@ -63,11 +70,27 @@ export class LiquidDb {
         return new Reference(path, this.socket);
     }
 
-    delete(path: string[]): Promise<EventData> {
-        return new Reference(['root'], this.socket).delete();
+    delete(path: string[]): Promise<OperationEventData> {
+        return new Reference([], this.socket).delete();
     }
 
-    set(data: any): Promise<EventData> {
-        return new Reference(['root'], this.socket).set(data);
+    set(data: any): Promise<OperationEventData> {
+        return new Reference([], this.socket).set(data);
+    }
+
+    value() {
+        return new Reference([], this.socket).value();
+    }
+
+    data(callback: (data: OperationEventData) => any) {
+        return new Reference([], this.socket).data(callback);
+    }
+
+    on(op: EventOperation, callback: (data: OperationEventData) => any) {
+        return new Reference([], this.socket).on(op, callback);
+    }
+
+    once(op: EventOperation, callback: (data: OperationEventData) => any) {
+        return new Reference([], this.socket).once(op, callback);
     }
 }

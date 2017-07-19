@@ -17,5 +17,7 @@ func main() {
 		db: liquiddb.New(),
 	}
 
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	log.Fatal(app.startServer())
 }

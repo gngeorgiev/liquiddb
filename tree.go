@@ -154,6 +154,7 @@ func (t tree) performOnNodes(data []normalizedData) []EventData {
 			}
 
 			ops = append(ops, info)
+
 			node.pristine = false
 		}
 	}
@@ -243,9 +244,24 @@ func (t tree) SetPath(path []string, data interface{}) ([]EventData, error) {
 
 	switch d := data.(type) {
 	case map[string]interface{}:
+		node := t.findNode(path, true)
+		diff := []string{}
+		for k := range node.Children {
+			if d[k] == nil {
+				diff = append(diff, k)
+			}
+		}
+
 		o, err := t.do(d, path)
 		if err != nil {
 			return nil, err
+		}
+
+		for _, k := range diff {
+			deletedOps, deleted := t.Delete(append(path, k))
+			if deleted {
+				o = append(o, deletedOps...)
+			}
 		}
 
 		ops = o
@@ -266,7 +282,6 @@ func (t tree) SetPath(path []string, data interface{}) ([]EventData, error) {
 func (t tree) iterateDescendants(node *Node, f func(node *Node)) {
 	f(node)
 	for _, n := range node.Children {
-		f(n)
 		t.iterateDescendants(n, f)
 	}
 }
@@ -315,7 +330,11 @@ func (t tree) Get(path []string) (EventData, error) {
 	}
 
 	if eventValue == nil {
-		eventValue = t.json.Search(path...).Data()
+		if len(path) == 1 && path[0] == TreeRoot {
+			eventValue = t.json.Data()
+		} else {
+			eventValue = t.json.Search(path...).Data()
+		}
 	}
 
 	var eventKey string

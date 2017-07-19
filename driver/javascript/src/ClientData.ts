@@ -13,6 +13,7 @@ export type ClientOperation =
 
 export interface ClientData {
     id?: number;
+    timestamp?: string;
     operation: ClientOperation;
     path?: string[];
     value?: any;
