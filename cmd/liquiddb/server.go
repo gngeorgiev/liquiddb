@@ -11,6 +11,7 @@ import (
 
 	"github.com/gngeorgiev/liquiddb"
 	"github.com/gorilla/websocket"
+	"github.com/rs/cors"
 	funk "github.com/thoas/go-funk"
 )
 
@@ -415,9 +416,13 @@ func (a App) startServer() error {
 		return true
 	}
 
-	http.HandleFunc("/db", a.dbHandler(upgrader))
-	http.HandleFunc("/stats", a.statsHandler(upgrader))
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/db", a.dbHandler(upgrader))
+	mux.HandleFunc("/stats", a.statsHandler(upgrader))
+
+	handler := cors.Default().Handler(mux)
 
 	log.Printf("Listening on port %s", serverPort)
-	return http.ListenAndServe(serverPort, nil)
+	return http.ListenAndServe(serverPort, handler)
 }

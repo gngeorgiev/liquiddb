@@ -1,0 +1,14 @@
+hash: b5323b41f2ce1507b27af4b724f8eb349944ea2f55f17269b57fc8188d01f172
+updated: 2017-07-20T01:45:04.593422274+03:00
+imports:
+- name: github.com/go-errors/errors
+  version: 8fa88b06e5974e97fbf9899a7f86a344bfd1f105
+- name: github.com/gorilla/websocket
+  version: ea4d1f681babbce9545c9c5f3d5194a789c89f5b
+- name: github.com/Jeffail/gabs
+  version: 2a3aa15961d5fee6047b8151b67ac2f08ba2c48c
+- name: github.com/rs/cors
+  version: 8dd4211afb5d08dbb39a533b9bb9e4b486351df6
+- name: github.com/thoas/go-funk
+  version: 14304e8530de7dbb909c8305591b3a8370dd9dbb
+testImports: []
