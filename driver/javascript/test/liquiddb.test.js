@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { LiquidDb } = require('../dist/node/index.node');
+const { LiquidDb } = require('../');
 
 const logLevel = process.env.LIQUID_LOG_LEVEL || 'error';
 

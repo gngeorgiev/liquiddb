@@ -101,12 +101,13 @@ func (c *clientConnection) WriteInterested(path string, o liquiddb.EventData) (b
 	}
 
 	for _, interest := range interests {
-		log.Println(interest.timestamp)
-		log.Println(o.Timestamp)
+		log.Printf("Interest timestamp %s", interest.timestamp)
+		log.Printf("Operation timestamp %s", o.Timestamp)
 		if interest.operation == op && o.Timestamp.After(interest.timestamp) {
 			return true, c.ws.WriteJSON(o)
 		} else if !o.Timestamp.After(interest.timestamp) {
-			log.Println("Didnt send, no matcing time")
+			log.Println("Didn't send, no matching time")
+			log.Println(interests)
 		}
 	}
 

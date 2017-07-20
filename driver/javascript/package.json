@@ -3,27 +3,30 @@
     "version": "0.0.2",
     "description": "",
     "main": "node/index",
-    "typings": "node/index",
+    "typings": "typings/index.node.d.ts",
     "scripts": {
         "test": "mocha --watch test/",
-        "build-browser": "node fuse build-browser",
-        "build-node": "tsc -w --outDir node",
+        "build-web": "webpack --config webpack.config.web.js",
+        "build-node": "webpack --config webpack.config.node.js",
         "test-once": "mocha test/"
     },
     "author": "",
     "license": "ISC",
     "devDependencies": {
         "assert": "^1.4.1",
-        "fuse-box": "^2.1.0",
         "mocha": "^3.4.2",
-        "typescript": "^2.3.4"
+        "ts-loader": "^2.3.1",
+        "typescript": "^2.3.4",
+        "webpack": "^3.3.0"
     },
     "dependencies": {
         "@types/moment": "^2.13.0",
         "@types/node": "^8.0.0",
         "colors": "^1.1.2",
+        "dts-bundle": "^0.7.3",
         "events": "^1.1.1",
         "html5-websocket": "^1.0.0",
+        "lodash": "^4.17.4",
         "mersenne-twister": "^1.1.0",
         "moment": "^2.18.1"
     }

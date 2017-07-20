@@ -238,9 +238,6 @@ export class Socket extends EventEmitter {
             this.subscribeImp(path, op, callback, id)
         );
 
-        return () =>
-            events.forEach(ev => {
-                this.unsubscribeImpl(ev);
-            });
+        return () => events.forEach(ev => this.unsubscribeImpl(ev));
     }
 }

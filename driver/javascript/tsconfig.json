@@ -5,6 +5,7 @@
         "typeRoots": ["node_modules/@types"],
         "downlevelIteration": true,
         "target": "es5",
-        "declaration": true
+        "declaration": true,
+        "declarationDir": "../typings"
     }
 }
