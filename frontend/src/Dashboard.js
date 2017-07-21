@@ -1,28 +1,25 @@
 import React, { Component } from 'react';
 import JSONTree from 'react-json-tree';
-import { LiquidDb } from 'liquiddb-javascript-driver/web';
-
-LiquidDb.configureLogger({
-    level: 'debug'
-});
+import PropTypes from 'prop-types';
 
 export class Dashboard extends Component {
+    static propTypes = {
+        db: PropTypes.any.isRequired
+    };
+
     state = {
         data: {}
     };
 
     async componentDidMount() {
-        this.db = await new LiquidDb().initialize();
-
-        window.db = this.db;
+        const { db } = this.props;
 
         const refresh = async () => {
-            const data = await this.db.value();
-
+            const data = await db.value();
             this.setState({ data });
         };
 
-        this._dataUnsubscribe = this.db.data(refresh);
+        this._dataUnsubscribe = db.data(refresh);
 
         refresh();
     }
@@ -32,6 +29,8 @@ export class Dashboard extends Component {
     }
 
     render() {
-        return <JSONTree data={this.state.data} />;
+        return (
+            <JSONTree data={this.state.data} shouldExpandNode={() => true} />
+        );
     }
 }

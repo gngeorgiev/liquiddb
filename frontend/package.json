@@ -5,6 +5,7 @@
     "dependencies": {
         "admin-on-rest": "^1.2.1",
         "liquiddb-javascript-driver": "file:../driver/javascript",
+        "prop-types": "^15.5.10",
         "react": "^15.6.1",
         "react-dom": "^15.6.1",
         "react-json-tree": "^0.10.9",
