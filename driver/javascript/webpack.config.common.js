@@ -14,7 +14,7 @@ DtsBundlePlugin.prototype.apply = function(compiler) {
 };
 
 module.exports = {
-    devtool: 'source-map',
+    devtool: 'cheap-module-eval-source-map',
     resolve: {
         extensions: ['.ts', '.js']
     },
