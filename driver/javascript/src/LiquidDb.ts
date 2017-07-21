@@ -47,6 +47,10 @@ export class LiquidDb {
         });
     }
 
+    get ready() {
+        return this.socket.ready;
+    }
+
     close() {
         this.socket.close();
     }
