@@ -1,6 +1,8 @@
 package liquiddb
 
 import (
+	"sort"
+
 	"github.com/Jeffail/gabs"
 	"github.com/go-errors/errors"
 )
@@ -202,21 +204,12 @@ func (t tree) setTreePathData(path []string, data interface{}) (EventData, error
 }
 
 func (t tree) updateJSON(data []EventData) {
-	maxLen := 0
-	maxLenData := make([]EventData, 0)
+	//TODO: this operation should be smarter. Only relevant operations must be executed on the json tree
+	//TODO: test thoroughly before rewriting it
+	sortedEvents := data[:]
+	sort.Sort(EventsSortedByTimestamp(sortedEvents))
 
-	for _, d := range data {
-		l := len(d.Path)
-		if l > maxLen {
-			maxLen = l
-			maxLenData = maxLenData[:0]
-			maxLenData = append(maxLenData, d)
-		} else if l == maxLen {
-			maxLenData = append(maxLenData, d)
-		}
-	}
-
-	for _, d := range maxLenData {
+	for _, d := range sortedEvents {
 		switch d.Operation {
 		case EventOperationInsert, EventOperationUpdate:
 			//we need to set the value of each key in the json downwards to an empty json object

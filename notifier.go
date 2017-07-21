@@ -33,6 +33,20 @@ type EventData struct {
 	Timestamp time.Time
 }
 
+type EventsSortedByTimestamp []EventData
+
+func (e EventsSortedByTimestamp) Len() int {
+	return len(e)
+}
+
+func (e EventsSortedByTimestamp) Swap(i, j int) {
+	e[i], e[j] = e[j], e[i]
+}
+
+func (e EventsSortedByTimestamp) Less(i, j int) bool {
+	return e[i].Timestamp.Before(e[j].Timestamp)
+}
+
 type notifier struct {
 	sync.Mutex
 	handlers    map[EventOperation][]chan<- EventData
