@@ -103,7 +103,7 @@ export class Socket extends EventEmitter {
             this.emit('ready');
         }
 
-        this.serverTime = utc(data.timestamp);
+        this.serverTime = this.lastLocalTimeUpdate = utc(data.timestamp);
     }
 
     private reconnect() {}
