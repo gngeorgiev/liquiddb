@@ -2,9 +2,10 @@ import React, { Component } from 'react';
 import JSONTree from 'react-json-tree';
 import PropTypes from 'prop-types';
 
-export class Dashboard extends Component {
+export class Database extends Component {
     static propTypes = {
-        db: PropTypes.any.isRequired
+        db: PropTypes.any.isRequired,
+        expand: PropTypes.bool
     };
 
     state = {
@@ -30,7 +31,10 @@ export class Dashboard extends Component {
 
     render() {
         return (
-            <JSONTree data={this.state.data} shouldExpandNode={() => true} />
+            <JSONTree
+                data={this.state.data}
+                shouldExpandNode={() => this.props.expand}
+            />
         );
     }
 }

@@ -3,13 +3,17 @@
     "version": "0.1.0",
     "private": true,
     "dependencies": {
-        "admin-on-rest": "^1.2.1",
         "liquiddb-javascript-driver": "file:../driver/javascript",
         "prop-types": "^15.5.10",
         "react": "^15.6.1",
         "react-dom": "^15.6.1",
         "react-json-tree": "^0.10.9",
-        "react-scripts": "^1.0.10"
+        "react-redux": "^5.0.5",
+        "react-router-dom": "^4.1.2",
+        "react-router-redux": "^5.0.0-alpha.6",
+        "react-scripts": "^1.0.10",
+        "redux": "^3.7.2",
+        "redux-thunk": "^2.2.0"
     },
     "scripts": {
         "start": "react-scripts start",

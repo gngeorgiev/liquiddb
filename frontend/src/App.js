@@ -1,15 +1,33 @@
 import React, { Component } from 'react';
-import './App.css';
-import { Admin } from 'admin-on-rest';
+import { Route } from 'react-router-dom';
+import { push } from 'react-router-redux';
+import { connect } from 'react-redux';
+import { bindActionCreators } from 'redux';
 import { LiquidDb } from 'liquiddb-javascript-driver/web';
+import AppBar from 'material-ui/AppBar';
+import Toolbar from 'material-ui/Toolbar';
+import Typography from 'material-ui/Typography';
+import IconButton from 'material-ui/IconButton';
+import List, { ListItem, ListItemText } from 'material-ui/List';
+import DashboardIcon from 'material-ui-icons/Dashboard';
+import MenuIcon from 'material-ui-icons/Menu';
+import StorageIcon from 'material-ui-icons/Storage';
 
-import { Dashboard } from './Dashboard';
+import { Dashboard } from './containers/dashboard/Dashboard';
+import { Database } from './containers/database/Database';
+
+import './App.css';
 
 LiquidDb.configureLogger({
     level: 'debug'
 });
 
 class App extends Component {
+    routesMap = {
+        '/': 'Dashboard',
+        '/database': 'Database'
+    };
+
     async componentDidMount() {
         this.db = await new LiquidDb().initialize();
 
@@ -21,12 +39,57 @@ class App extends Component {
     }
 
     render() {
-        if (this.db && this.db.ready) {
+        const { routesMap, db } = this;
+        const { path } = this.props;
+
+        if (db && db.ready) {
             return (
-                <Admin
-                    dashboard={() => <Dashboard db={this.db} />}
-                    restClient={() => Promise.resolve()}
-                />
+                <div>
+                    <AppBar position="static">
+                        <Toolbar>
+                            <IconButton color="contrast" aria-label="Menu">
+                                <MenuIcon />
+                            </IconButton>
+                            <Typography type="title" color="inherit">
+                                {routesMap[path]}
+                            </Typography>
+                        </Toolbar>
+                    </AppBar>
+
+                    <div className="main-container">
+                        <div className="menu">
+                            <List>
+                                <ListItem
+                                    button
+                                    onClick={() => this.props.goToDashboard()}
+                                >
+                                    <DashboardIcon />
+                                    <ListItemText primary="Dashboard" />
+                                </ListItem>
+                                <ListItem
+                                    button
+                                    onClick={() => this.props.goToDatabase()}
+                                >
+                                    <StorageIcon />
+                                    <ListItemText primary="Database" />
+                                </ListItem>
+                            </List>
+                        </div>
+                        <div className="main">
+                            <Route
+                                exact
+                                path="/"
+                                component={() => <Dashboard db={db} />}
+                            />
+                            <Route
+                                exact
+                                path="/database"
+                                component={() =>
+                                    <Database expand={true} db={db} />}
+                            />
+                        </div>
+                    </div>
+                </div>
             );
         }
 
@@ -34,4 +97,17 @@ class App extends Component {
     }
 }
 
-export default App;
+const mapStateToProps = state => ({
+    path: state.routing && state.routing.location.pathname
+});
+
+const mapDispatchToProps = dispatch =>
+    bindActionCreators(
+        {
+            goToDashboard: () => push('/'),
+            goToDatabase: () => push('/database')
+        },
+        dispatch
+    );
+
+export default connect(mapStateToProps, mapDispatchToProps)(App);

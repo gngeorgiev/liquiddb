@@ -1,0 +1,10 @@
+.database-container {
+    display: flex;
+    flex-flow: column;
+    justify-content: space-between;
+}
+
+.database-container > * {
+    margin: 0;
+    margin-bottom: 10px;
+}
