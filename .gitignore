@@ -3,6 +3,7 @@ debug.test
 .idea/**
 .vscode/**
 cmd/liquiddb/debug
+cmd/liquiddb/vendor/**
 
 driver/javascript/.fusebox/**
 driver/javascript/node_modules/**
