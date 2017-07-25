@@ -1,9 +1,6 @@
 package liquiddb
 
 import (
-	"sort"
-
-	"github.com/Jeffail/gabs"
 	"github.com/go-errors/errors"
 )
 
@@ -62,14 +59,11 @@ func newNode(key string, parent *Node) *Node {
 
 type tree struct {
 	root *Node
-	//in the future json will be used for persistence
-	json *gabs.Container
 }
 
 func newTree() *tree {
 	return &tree{
 		root: newNode(TreeRoot, nil),
-		json: gabs.New(),
 	}
 }
 
@@ -179,7 +173,6 @@ func (t tree) Set(data map[string]interface{}) ([]EventData, error) {
 		return nil, err
 	}
 
-	t.updateJSON(ops)
 	return ops, nil
 }
 
@@ -201,35 +194,6 @@ func (t tree) setTreePathData(path []string, data interface{}) (EventData, error
 		Path:      path,
 		Value:     data,
 	}, nil
-}
-
-func (t tree) updateJSON(data []EventData) {
-	//TODO: this operation should be smarter. Only relevant operations must be executed on the json tree
-	//TODO: test thoroughly before rewriting it
-	sortedEvents := data[:]
-	sort.Sort(EventsSortedByTimestamp(sortedEvents))
-
-	for _, d := range sortedEvents {
-		switch d.Operation {
-		case EventOperationInsert, EventOperationUpdate:
-			//we need to set the value of each key in the json downwards to an empty json object
-			//so the library can assign it a proper value at the end
-			for i := range d.Path {
-				if i == len(d.Path)-1 {
-					break
-				}
-
-				pathSoFar := d.Path[:i+1]
-				if _, ok := t.json.Search(pathSoFar...).Data().(map[string]interface{}); !ok {
-					t.json.Set(map[string]interface{}{}, pathSoFar...)
-				}
-			}
-
-			t.json.Set(d.Value, d.Path...)
-		case EventOperationDelete:
-			t.json.Delete(d.Path...)
-		}
-	}
 }
 
 func (t tree) SetPath(path []string, data interface{}) ([]EventData, error) {
@@ -267,15 +231,16 @@ func (t tree) SetPath(path []string, data interface{}) ([]EventData, error) {
 		ops = []EventData{op}
 	}
 
-	t.updateJSON(ops)
-
 	return ops, nil
 }
 
-func (t tree) iterateDescendants(node *Node, f func(node *Node)) {
-	f(node)
+func (t tree) iterateDescendants(node *Node, f func(node *Node), includeSelf bool) {
+	if includeSelf {
+		f(node)
+	}
+
 	for _, n := range node.Children {
-		t.iterateDescendants(n, f)
+		t.iterateDescendants(n, f, true)
 	}
 }
 
@@ -301,10 +266,52 @@ func (t tree) Delete(path []string) ([]EventData, bool) {
 
 		node.Value = nil
 		node.Parent = nil
-	})
+	}, true)
 
-	t.updateJSON(eventData)
 	return eventData, true
+}
+
+func (t tree) getJSON(node *Node, level int) interface{} {
+	res := make(map[string]interface{})
+
+	if node == nil {
+		return nil
+	}
+
+	if len(node.Children) == 0 {
+		if node.Value == nil {
+			return res
+		}
+
+		return node.Value
+	}
+
+	setJSONValue := func(json map[string]interface{}, path []string, value interface{}) {
+		currentJSON := json
+		for i, p := range path {
+			if i < len(path) {
+				if i == len(path)-1 {
+					currentJSON[p] = value
+				} else {
+					if currentJSON[p] == nil {
+						currentJSON[p] = make(map[string]interface{})
+					}
+
+					currentJSON = currentJSON[p].(map[string]interface{})
+				}
+			}
+		}
+
+	}
+
+	t.iterateDescendants(node, func(childNode *Node) {
+		//we need to iterate only the leafs
+		if len(childNode.Children) == 0 {
+			setJSONValue(res, childNode.Path[level:], childNode.Value)
+		}
+	}, false)
+
+	return res
 }
 
 func (t tree) Get(path []string) (EventData, error) {
@@ -317,18 +324,7 @@ func (t tree) Get(path []string) (EventData, error) {
 		eventPath = path
 	}
 
-	var eventValue interface{}
-	if node != nil {
-		eventValue = node.Value
-	}
-
-	if eventValue == nil {
-		if len(path) == 1 && path[0] == TreeRoot {
-			eventValue = t.json.Data()
-		} else {
-			eventValue = t.json.Search(path...).Data()
-		}
-	}
+	eventValue := t.getJSON(node, len(path))
 
 	var eventKey string
 	if node != nil {

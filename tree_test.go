@@ -119,6 +119,30 @@ func TestTree_Get(t *testing.T) {
 	}
 }
 
+func TestTree_Set_Get_Complex(t *testing.T) {
+	tree := New()
+
+	j := map[string]interface{}{
+		"test": map[string]interface{}{
+			"1":     5,
+			"pesho": 15,
+			"test1": map[string]interface{}{
+				"gosho": "fdafdafdafda",
+			},
+		},
+	}
+	tree.Set(j)
+
+	data, err := tree.Get([]string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(data.Value, j) {
+		t.Fatalf("Invalid json data %+v", data.Value)
+	}
+}
+
 func TestTree_GetNonExisting(t *testing.T) {
 	tree := New()
 
@@ -145,6 +169,6 @@ func TestTree_GetJson(t *testing.T) {
 	if !reflect.DeepEqual(data.Value, map[string]interface{}{
 		"bar": []byte("foobar"),
 	}) {
-		t.Fatal("Incorrect json value")
+		t.Fatalf("Incorrect json value %+v", data.Value)
 	}
 }
