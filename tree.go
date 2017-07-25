@@ -336,5 +336,5 @@ func (t tree) Get(path []string) (EventData, error) {
 		Operation: EventOperationGet,
 		Path:      eventPath,
 		Value:     eventValue,
-	}, nil //TODO: not returning not found, i think its fine
+	}, nil //TODO: not returning not found, i think it's fine
 }

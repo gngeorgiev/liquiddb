@@ -46,18 +46,33 @@ describe('crud', () => {
         await db.delete();
     });
 
-    it('should set data and get with value', async () => {
-        const data = await ref.set(5);
-        assert(data.value, 5);
+    it('should delete only the specified ref', async () => {
+        db.set({
+            bar: 5
+        });
+
+        await ref.set(5);
+        assert.equal(await ref.value(), 5);
+        assert.equal(await db.ref('bar').value(), 5);
+
+        await ref.delete();
+        assert.equal(await db.ref('bar').value(), 5);
+        const val = await ref.value();
+        assert.equal(val, undefined);
     });
 
     it('should set data and get with value', async () => {
         const data = await ref.set(5);
-        assert(data.value, 5);
-        assert(data.operation, 'insert');
+        assert.equal(data.value, 5);
+    });
+
+    it('should set data and get with value', async () => {
+        const data = await ref.set(5);
+        assert.equal(data.value, 5);
+        assert.equal(data.operation, 'insert');
 
         const value = await ref.value();
-        assert(value, 5);
+        assert.equal(value, 5);
     });
 
     it('should set data', () => {
@@ -206,11 +221,12 @@ describe('multiple connected sockets', () => {
     });
 
     it('should set data and get with value', async () => {
+        dbs[0].delete();
         const data = await dbs[0].ref('foo.bar').set(5);
-        assert(data.value, 5);
-        assert(data.operation, 'insert');
+        assert.equal(data.value, 5);
+        assert.equal(data.operation, 'insert');
 
         const value = await dbs[2].ref('foo.bar').value();
-        assert(value, 5);
+        assert.equal(value, 5);
     });
 });
