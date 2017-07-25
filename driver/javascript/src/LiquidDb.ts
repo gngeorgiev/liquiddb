@@ -51,8 +51,12 @@ export class LiquidDb {
         return this.socket.ready;
     }
 
+    reconnect() {
+        return this.socket.reconnect();
+    }
+
     close() {
-        this.socket.close();
+        return this.socket.close();
     }
 
     ref(path: string | string[]): Reference {

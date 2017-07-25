@@ -1,18 +1,3 @@
-const dts = require('dts-bundle');
-
-function DtsBundlePlugin() {}
-DtsBundlePlugin.prototype.apply = function(compiler) {
-    compiler.plugin('done', function() {
-        dts.bundle({
-            name: libraryName,
-            main: 'src/index.d.ts',
-            out: '../index.d.ts',
-            removeSource: true,
-            outputAsModuleFolder: true // to use npm in-package typings
-        });
-    });
-};
-
 module.exports = {
     devtool: 'cheap-module-eval-source-map',
     resolve: {

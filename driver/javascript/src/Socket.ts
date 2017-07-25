@@ -24,22 +24,33 @@ const javascriptUnixTimeLength = 13;
 export class Socket extends EventEmitter {
     private socketOpen: boolean;
     private receivedHearthbeat: boolean;
-
     private generator: MersenneTwister = new MersenneTwister();
     private events: Map<number, SocketEvent> = new Map();
-
     private serverTime: Moment;
     private lastLocalTimeUpdate: Moment;
-
     private ws: WebSocket;
+    private disconnectedQueue: ClientData[] = [];
+    private shouldAutoReconnect: boolean = true;
 
     get ready(): boolean {
         return this.socketOpen && this.receivedHearthbeat;
     }
 
+    reconnect: () => Promise<any>;
+
     constructor(private address: string, websocket: typeof WebSocket) {
         super();
-        this.initWebSocket(websocket);
+        this.reconnect = () =>
+            new Promise(resolve => {
+                this.once('ready', () => {
+                    this.shouldAutoReconnect = true;
+                    resolve();
+                });
+                log.info('Reconnecting...');
+                this.initWebSocket(websocket);
+            });
+
+        this.reconnect();
     }
 
     private initWebSocket(webSocket: typeof WebSocket) {
@@ -51,17 +62,37 @@ export class Socket extends EventEmitter {
     }
 
     private onSocketClose() {
+        this.emit('close');
+
         this.socketOpen = false;
         this.receivedHearthbeat = false;
+        if (this.shouldAutoReconnect) {
+            this.reconnect();
+        }
     }
 
     private onSocketError(error) {
-        log.fatal(error);
+        log.error(error);
         this.onSocketClose();
     }
 
     private onSocketOpen() {
         this.socketOpen = true;
+        log.info('Connected!');
+
+        this.once('ready', () => {
+            this.disconnectedQueue.forEach(d => this.send(d));
+            this.disconnectedQueue = [];
+
+            for (let event of this.events.values()) {
+                this.subscribe(
+                    event.path,
+                    event.operation,
+                    event.id,
+                    event.callback
+                );
+            }
+        });
     }
 
     private onSocketMessage(msg: MessageEvent) {
@@ -106,8 +137,6 @@ export class Socket extends EventEmitter {
         this.serverTime = this.lastLocalTimeUpdate = utc(data.timestamp);
     }
 
-    private reconnect() {}
-
     private buildEventPath(path: string[], op: EventOperation, id: number) {
         const parts = [op || null, id ? String(id) : null].filter(a => a);
         return path.concat(parts).join('.');
@@ -117,14 +146,14 @@ export class Socket extends EventEmitter {
         const { path, event, operation, id, callback } = socketEvent;
 
         this.removeListener(event, callback);
+        this.events.delete(id);
+
         this.send({
             id,
             path,
             operation: ClientOperationUnSubscribe,
             value: operation
         });
-
-        this.events.delete(id);
     }
 
     private subscribeImp(
@@ -173,11 +202,16 @@ export class Socket extends EventEmitter {
         data.timestamp = data.timestamp || this.serverTime.toISOString();
     }
 
-    close() {
-        this.ws.close();
-        for (let event of this.events.values()) {
-            this.unsubscribeImpl(event);
-        }
+    close(): Promise<any> {
+        return new Promise(async resolve => {
+            this.shouldAutoReconnect = false;
+            for (let event of this.events.values()) {
+                this.unsubscribeImpl(event);
+            }
+
+            this.ws.close();
+            this.once('close', () => resolve());
+        });
     }
 
     sendWait(
@@ -189,9 +223,7 @@ export class Socket extends EventEmitter {
             //we need to save the id, so we are generating it manually
             const id = this.generator.random_int();
 
-            this.subscribeOnce(path, operations, id, data => {
-                resolve(data);
-            });
+            this.subscribeOnce(path, operations, id, data => resolve(data));
 
             data.id = id;
             this.send(data);
@@ -199,6 +231,10 @@ export class Socket extends EventEmitter {
     }
 
     send(data: ClientData): number {
+        if (!this.ready) {
+            return this.disconnectedQueue.push(data);
+        }
+
         this.updateServerTimeWithDelta();
         this.ensureClientDataFields(data);
 

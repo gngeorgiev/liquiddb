@@ -44,7 +44,7 @@ export function logger(component: string) {
         warning(msg: any) {
             log(msg, LogLevel.warning);
         },
-        information(msg: any) {
+        info(msg: any) {
             log(msg, LogLevel.information);
         },
         debug(msg: any) {

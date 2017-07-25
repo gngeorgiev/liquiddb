@@ -230,3 +230,45 @@ describe('multiple connected sockets', () => {
         assert.equal(value, 5);
     });
 });
+
+describe('reconnect', () => {
+    let db;
+
+    before(async () => {
+        db = await new LiquidDb().initialize();
+    });
+
+    after(() => {
+        db.close();
+    });
+
+    it('Should execute operation after reconnection', done => {
+        db.close().then(async () => {
+            const dbVal = { test: 1 };
+            db.set(dbVal);
+            db.value().then(val => {
+                assert.deepEqual(val, dbVal);
+                done();
+            });
+
+            await db.reconnect();
+        });
+    });
+
+    it('should receive events after reconnection', done => {
+        const dbVal = { test: 1 };
+
+        db.set(dbVal).then(() => {
+            db.data(d => {
+                assert.equal(d.operation, 'update');
+                done();
+            });
+
+            db.close().then(async () => {
+                await db.reconnect();
+
+                db.set(dbVal);
+            });
+        });
+    });
+});
