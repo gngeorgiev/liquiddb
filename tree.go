@@ -289,16 +289,14 @@ func (t tree) getJSON(node *Node, level int) interface{} {
 	setJSONValue := func(json map[string]interface{}, path []string, value interface{}) {
 		currentJSON := json
 		for i, p := range path {
-			if i < len(path) {
-				if i == len(path)-1 {
-					currentJSON[p] = value
-				} else {
-					if currentJSON[p] == nil {
-						currentJSON[p] = make(map[string]interface{})
-					}
-
-					currentJSON = currentJSON[p].(map[string]interface{})
+			if i == len(path)-1 {
+				currentJSON[p] = value
+			} else {
+				if currentJSON[p] == nil {
+					currentJSON[p] = make(map[string]interface{})
 				}
+
+				currentJSON = currentJSON[p].(map[string]interface{})
 			}
 		}
 
