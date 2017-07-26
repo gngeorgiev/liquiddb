@@ -13,8 +13,8 @@ import DashboardIcon from 'material-ui-icons/Dashboard';
 import MenuIcon from 'material-ui-icons/Menu';
 import StorageIcon from 'material-ui-icons/Storage';
 
-import { Dashboard } from './containers/dashboard/Dashboard';
-import { Database } from './containers/database/Database';
+import { Dashboard } from './containers/dashboard/dashboard.container';
+import Database from './containers/database/database.container';
 
 import './App.css';
 

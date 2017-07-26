@@ -1,0 +1,16 @@
+.save-icon {
+    width: 15px !important;
+    height: 15px !important;
+    margin-right: 15px;
+}
+
+.code-container {
+    display: flex;
+    flex-flow: column;
+    justify-content: space-between;
+}
+
+.code-container > * {
+    margin: 0;
+    margin-bottom: 10px;
+}

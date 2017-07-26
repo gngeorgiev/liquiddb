@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import JSONTree from 'react-json-tree';
 import PropTypes from 'prop-types';
 
-export class Database extends Component {
+export default class Database extends Component {
     static propTypes = {
         db: PropTypes.any.isRequired,
         expand: PropTypes.bool

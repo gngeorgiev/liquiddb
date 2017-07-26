@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import { Database } from '../../components/database/Database';
+import DatabaseViewer from '../../components/database-viewer/database-viewer.component';
 
 export class Dashboard extends Component {
     static propTypes = {
@@ -8,6 +8,6 @@ export class Dashboard extends Component {
     };
 
     render() {
-        return <Database expand={false} db={this.props.db} />;
+        return <DatabaseViewer expand={true} db={this.props.db} />;
     }
 }

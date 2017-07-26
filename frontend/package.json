@@ -4,8 +4,12 @@
     "private": true,
     "dependencies": {
         "liquiddb-javascript-driver": "file:../driver/javascript",
+        "material-ui": "^1.0.0-beta.2",
+        "material-ui-icons": "^1.0.0-alpha.19",
+        "moment": "^2.18.1",
         "prop-types": "^15.5.10",
         "react": "^15.6.1",
+        "react-ace": "^5.1.1",
         "react-dom": "^15.6.1",
         "react-json-tree": "^0.10.9",
         "react-redux": "^5.0.5",
@@ -13,7 +17,9 @@
         "react-router-redux": "^5.0.0-alpha.6",
         "react-scripts": "^1.0.10",
         "redux": "^3.7.2",
-        "redux-thunk": "^2.2.0"
+        "redux-thunk": "^2.2.0",
+        "terminal-in-react": "git+https://github.com/gngeorgiev/terminal-in-react.git#3.x.x",
+        "typeface-roboto": "0.0.31"
     },
     "scripts": {
         "start": "react-scripts start",

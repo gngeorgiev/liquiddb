@@ -1,27 +1,20 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import { Database as DatabaseComponent } from '../../components/database/Database';
 import AceEditor from 'react-ace';
-import Button from 'material-ui/Button';
 import CheckIcon from 'material-ui-icons/Check';
 import CloseIcon from 'material-ui-icons/Close';
 import * as moment from 'moment';
+import Button from 'material-ui/Button';
 
 import 'brace/mode/javascript';
 import 'brace/theme/monokai';
-import './Database.css';
-
-const codeWrapper = `(function code() {
-    return async function (db) {
-        $code
-    }; 
-}())`;
+import './code-editor.component.css';
 
 const codeSaveKey = '__editor_code';
 
-export class Database extends Component {
-    static propTypes = {
-        db: PropTypes.any.isRequired
+export default class CodeEditor extends Component {
+    static PropTypes = {
+        onExecute: PropTypes.func
     };
 
     state = {
@@ -30,21 +23,6 @@ export class Database extends Component {
         code: ''
     };
 
-    async runCode() {
-        const { db } = this.props;
-        const { code } = this.state;
-
-        const codeString = codeWrapper.replace('$code', code);
-        try {
-            // eslint-disable-next-line
-            const codeFn = eval(codeString);
-            const res = await codeFn(db);
-            console.log(res);
-        } catch (e) {
-            console.error(e);
-        }
-    }
-
     bindEditorCommands() {
         const { editor } = this.refs.editor;
 
@@ -52,24 +30,23 @@ export class Database extends Component {
             name: 'save',
             bindKey: { win: 'Ctrl-S', mac: 'Cmd-S' },
             exec: () => {
-                {
-                    localStorage.setItem(
-                        codeSaveKey,
-                        JSON.stringify({
-                            code: this.state.code,
-                            timestamp: new Date().toISOString()
-                        })
-                    );
+                localStorage.setItem(
+                    codeSaveKey,
+                    JSON.stringify({
+                        code: this.state.code,
+                        timestamp: new Date().toISOString()
+                    })
+                );
 
-                    this.setState({ editorDirty: false });
-                }
+                this.setState({ editorDirty: false });
+                this._updateLastSaved();
             }
         });
 
         editor.commands.addCommand({
             name: 'execute-code',
             bindKey: { win: 'Ctrl-Enter', mac: 'Cmd-Enter' },
-            exec: () => this.runCode()
+            exec: () => this.props.onExecute(this.state.code)
         });
     }
 
@@ -85,7 +62,7 @@ export class Database extends Component {
     }
 
     initializeLastSavedInterval() {
-        const intervalCallback = () => {
+        this._updateLastSaved = () => {
             const savedCodeEntry = JSON.parse(
                 localStorage.getItem(codeSaveKey) || '{}'
             );
@@ -104,8 +81,8 @@ export class Database extends Component {
             });
         };
 
-        this._lastSavedInterval = setInterval(intervalCallback, 5000);
-        intervalCallback();
+        this._lastSavedInterval = setInterval(this._updateLastSaved, 5000);
+        this._updateLastSaved();
     }
 
     componentDidMount() {
@@ -120,7 +97,7 @@ export class Database extends Component {
 
     render() {
         return (
-            <div className="database-container">
+            <div className="code-container">
                 <div>
                     {this.state.editorDirty
                         ? <CloseIcon className="save-icon" />
@@ -142,11 +119,13 @@ export class Database extends Component {
                     width="100%"
                 />
 
-                <Button raised color="primary" onClick={() => this.runCode()}>
+                <Button
+                    raised
+                    color="primary"
+                    onClick={() => this.props.onExecute(this.state.code)}
+                >
                     Run Code
                 </Button>
-
-                <DatabaseComponent expand={true} db={this.props.db} />
             </div>
         );
     }
