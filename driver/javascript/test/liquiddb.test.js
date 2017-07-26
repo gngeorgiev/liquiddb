@@ -17,7 +17,7 @@ describe('basic', () => {
     });
 
     it('should initialize properly', async () => {
-        const db = await new LiquidDb().initialize();
+        const db = await new LiquidDb().connect();
         assert.equal(db.socket.socketOpen, true);
         assert.equal(db.socket.receivedHearthbeat, true);
         db.socket.close();
@@ -29,7 +29,7 @@ describe('crud', () => {
     let ref;
 
     before(async () => {
-        db = await new LiquidDb().initialize();
+        db = await new LiquidDb().connect();
         ref = db.ref('foo');
     });
 
@@ -211,9 +211,9 @@ describe('multiple connected sockets', () => {
     const dbs = [];
 
     before(async () => {
-        dbs.push(await new LiquidDb().initialize());
-        dbs.push(await new LiquidDb().initialize());
-        dbs.push(await new LiquidDb().initialize());
+        dbs.push(await new LiquidDb().connect());
+        dbs.push(await new LiquidDb().connect());
+        dbs.push(await new LiquidDb().connect());
     });
 
     after(() => {
@@ -235,7 +235,7 @@ describe('reconnect', () => {
     let db;
 
     before(async () => {
-        db = await new LiquidDb().initialize();
+        db = await new LiquidDb().connect();
     });
 
     after(() => {

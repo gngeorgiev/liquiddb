@@ -71,7 +71,7 @@ export class Socket extends EventEmitter {
         }
     }
 
-    private onSocketError(error) {
+    private onSocketError(error: Error) {
         log.error(error);
         this.onSocketClose();
     }

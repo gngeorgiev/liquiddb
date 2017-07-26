@@ -258,6 +258,7 @@ func (a App) handleSocketClient(conn *clientConnection, terminate chan struct{})
 
 func (a App) handleSocketHearthbeat(conn *clientConnection, terminate chan struct{}) error {
 	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
 
 	sendHearthbeat := func() error {
 		err := conn.WriteJSON(struct {
@@ -285,7 +286,6 @@ func (a App) handleSocketHearthbeat(conn *clientConnection, terminate chan struc
 			return nil
 		case <-ticker.C:
 			if err := sendHearthbeat(); err != nil {
-				ticker.Stop()
 				log.Printf("hearthbeat: %s", err)
 				return err
 			}
@@ -369,25 +369,29 @@ func (a App) dbHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, 
 }
 
 type stats struct {
-	connectionsCount int
+	ConnectionsCount int `json:"connectionsCount,omitempty"`
 }
 
 func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, r *http.Request) {
-	connectionsCount := make(chan int)
+	var connectionsCountsMutex sync.Mutex
+	connectionsCounts := make([]chan int, 0)
 
 	go func() {
+		updateConnectionsCount := func() {
+			l := len(conns.connections)
+			connectionsCountsMutex.Lock()
+			defer connectionsCountsMutex.Unlock()
+			for _, ch := range connectionsCounts {
+				ch <- l
+			}
+		}
+
 		for {
 			select {
 			case <-conns.connectionAdded:
-				select {
-				case connectionsCount <- len(conns.connections):
-				default:
-				}
+				updateConnectionsCount()
 			case <-conns.connectionRemoved:
-				select {
-				case connectionsCount <- len(conns.connections):
-				default:
-				}
+				updateConnectionsCount()
 			}
 		}
 	}()
@@ -399,10 +403,32 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 			return
 		}
 
+		countCh := make(chan int)
+
+		defer func() {
+			close(countCh)
+
+			connectionsCountsMutex.Lock()
+			index := funk.IndexOf(connectionsCounts, countCh)
+			connectionsCounts = append(connectionsCounts[:index], connectionsCounts[index+1:]...)
+			connectionsCountsMutex.Unlock()
+		}()
+
+		connectionsCountsMutex.Lock()
+		connectionsCounts = append(connectionsCounts, countCh)
+		connectionsCountsMutex.Unlock()
+
+		//send the stats on the initial connection
+		if err := ws.WriteJSON(stats{len(conns.connections)}); err != nil {
+			log.Println(err)
+			return
+		}
+
 		for {
 			select {
-			case c := <-connectionsCount:
+			case c := <-countCh:
 				if err := ws.WriteJSON(stats{c}); err != nil {
+					log.Println(err)
 					return
 				}
 			}

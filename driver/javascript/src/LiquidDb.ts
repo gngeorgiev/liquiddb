@@ -3,18 +3,16 @@ import { Reference } from './Reference';
 import { ClientOperationDelete, ClientOperationSet } from './ClientData';
 import { OperationEventData, EventOperation } from './EventData';
 import { configure, LogLevel } from './log';
+import { Dependencies } from './Dependencies';
 
 export interface DbSettings {
     address?: string;
 }
 
-export interface Shims {
-    webSocket?: typeof WebSocket;
-}
-
 export class LiquidDb {
     private socket: Socket;
-    private static shims: Shims;
+
+    static dependencies: Dependencies;
 
     constructor(
         private settings: DbSettings = {
@@ -22,29 +20,32 @@ export class LiquidDb {
         }
     ) {}
 
-    static initializeShims(shims: Shims) {
-        LiquidDb.shims = shims;
-    }
-
     static configureLogger(conf: { level: LogLevel }) {
         configure(conf);
     }
 
     static LogLevel: typeof LogLevel = LogLevel;
 
-    initialize(): Promise<LiquidDb> {
+    async connect(): Promise<LiquidDb> {
+        if (this.socket) {
+            await this.reconnect();
+            return this;
+        }
+
         this.socket = new Socket(
             this.settings.address,
-            LiquidDb.shims.webSocket
+            LiquidDb.dependencies.webSocket
         );
 
-        return new Promise(resolve => {
+        await new Promise(resolve => {
             if (this.socket.ready) {
                 return resolve(this);
             }
 
             this.socket.once('ready', () => resolve(this));
         });
+
+        return this;
     }
 
     get ready() {

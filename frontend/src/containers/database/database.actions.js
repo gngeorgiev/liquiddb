@@ -27,6 +27,7 @@ export const executeDatabaseCode = (code, db, print) => {
             });
 
             print(e.toString());
+            console.error(e);
         }
     };
 };

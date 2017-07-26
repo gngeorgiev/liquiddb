@@ -1,4 +1,9 @@
-export default (state = {}, action) => {
+export default (
+    state = {
+        executionResult: ''
+    },
+    action
+) => {
     switch (action.type) {
         case 'EXECUTE_CODE':
             return Object.assign({}, state, {

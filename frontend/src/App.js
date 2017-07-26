@@ -3,7 +3,7 @@ import { Route } from 'react-router-dom';
 import { push } from 'react-router-redux';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
-import { LiquidDb } from 'liquiddb-javascript-driver/web';
+import { LiquidDb, LiquidDbStats } from 'liquiddb-javascript-driver/web';
 import AppBar from 'material-ui/AppBar';
 import Toolbar from 'material-ui/Toolbar';
 import Typography from 'material-ui/Typography';
@@ -13,7 +13,7 @@ import DashboardIcon from 'material-ui-icons/Dashboard';
 import MenuIcon from 'material-ui-icons/Menu';
 import StorageIcon from 'material-ui-icons/Storage';
 
-import { Dashboard } from './containers/dashboard/dashboard.container';
+import Dashboard from './containers/dashboard/dashboard.container';
 import Database from './containers/database/database.container';
 
 import './App.css';
@@ -25,22 +25,23 @@ LiquidDb.configureLogger({
 class App extends Component {
     routesMap = {
         '/': 'Dashboard',
-        '/database': 'Database'
+        '/database': 'Database',
+        '/stats': 'Stats'
     };
 
-    async componentDidMount() {
-        this.db = await new LiquidDb().initialize();
-
-        this.forceUpdate();
+    componentDidMount() {
+        this.props.initializeDb();
+        this.props.initializeDbStats();
     }
 
     componentWillUnmount() {
-        this.db.close();
+        this.props.db.close();
+        this.props.dbStats.close();
     }
 
     render() {
-        const { routesMap, db } = this;
-        const { path } = this.props;
+        const { routesMap } = this;
+        const { path, db } = this.props;
 
         if (db && db.ready) {
             return (
@@ -79,13 +80,12 @@ class App extends Component {
                             <Route
                                 exact
                                 path="/"
-                                component={() => <Dashboard db={db} />}
+                                component={() => <Dashboard />}
                             />
                             <Route
                                 exact
                                 path="/database"
-                                component={() =>
-                                    <Database expand={true} db={db} />}
+                                component={() => <Database />}
                             />
                         </div>
                     </div>
@@ -98,14 +98,50 @@ class App extends Component {
 }
 
 const mapStateToProps = state => ({
-    path: state.routing && state.routing.location.pathname
+    path: state.routing && state.routing.location.pathname,
+    db: state.db,
+    dbStats: state.dbStats
 });
 
 const mapDispatchToProps = dispatch =>
     bindActionCreators(
         {
             goToDashboard: () => push('/'),
-            goToDatabase: () => push('/database')
+            goToDatabase: () => push('/database'),
+            initializeDb: () => async dispatch => {
+                const db = await new LiquidDb().connect();
+
+                const refresh = async () => {
+                    const data = await db.value();
+                    dispatch({
+                        type: 'DB_DATA',
+                        data
+                    });
+                };
+
+                dispatch({
+                    type: 'INITIALIZE_DB',
+                    db
+                });
+
+                db.data(refresh);
+                refresh();
+            },
+            initializeDbStats: () => async dispatch => {
+                const stats = await new LiquidDbStats().connect();
+
+                stats.on('data', data => {
+                    dispatch({
+                        type: 'DB_STATS_DATA',
+                        data
+                    });
+                });
+
+                return dispatch({
+                    type: 'INITIALIZE_DB_STATS',
+                    stats
+                });
+            }
         },
         dispatch
     );
