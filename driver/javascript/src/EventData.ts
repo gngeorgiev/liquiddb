@@ -3,6 +3,7 @@ export const EventOperationDelete = 'delete';
 export const EventOperationUpdate = 'update';
 export const EventOperationGet = 'get';
 export const EventOperationHearthbeat = 'hearthbeat';
+
 export type EventOperation =
     | 'insert'
     | 'delete'

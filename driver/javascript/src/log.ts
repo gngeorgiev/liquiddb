@@ -23,7 +23,8 @@ let logLevel: LogLevel = LogLevel.off;
 
 export function logger(component: string) {
     const log = (data: any, level: LogLevel) => {
-        if (level > logLevel) {
+        const levelNumber = LogLevel[logLevel] as any;
+        if (level > levelNumber) {
             return;
         }
 

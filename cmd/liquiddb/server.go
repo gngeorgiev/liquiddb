@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -18,12 +19,13 @@ import (
 type clientOperation string
 
 const (
-	clientOperationSet         = clientOperation("set")
-	clientOperationDelete      = clientOperation("delete")
-	clientOperationGet         = clientOperation("get")
-	clientOperationSubscribe   = clientOperation("subscribe")
-	clientOperationUnSubscribe = clientOperation("unsubscribe")
-	hearthbeatOperation        = "hearthbeat"
+	clientOperationSet          = clientOperation("set")
+	clientOperationDelete       = clientOperation("delete")
+	clientOperationGet          = clientOperation("get")
+	clientOperationSubscribe    = clientOperation("subscribe")
+	clientOperationUnSubscribe  = clientOperation("unsubscribe")
+	hearthbeatOperation         = "hearthbeat"
+	hearthbeatResponseOperation = "hearthbeatResponse"
 )
 
 type operationClientData struct {
@@ -56,6 +58,11 @@ type clientConnection struct {
 	mu        sync.Mutex
 	interests map[string][]*clientInterest
 
+	latencyMutex       sync.Mutex
+	latencyHistory     [3]int32
+	latency            int32
+	hearthbeatResponse chan struct{}
+
 	ws *websocket.Conn
 }
 
@@ -72,9 +79,15 @@ func (c *clientConnection) close() error {
 
 func newClientConnection(ws *websocket.Conn) *clientConnection {
 	c := &clientConnection{
-		sync.Mutex{},
-		map[string][]*clientInterest{},
-		ws,
+		mu:        sync.Mutex{},
+		interests: map[string][]*clientInterest{},
+
+		latencyMutex:       sync.Mutex{},
+		latencyHistory:     [3]int32{},
+		latency:            0,
+		hearthbeatResponse: make(chan struct{}),
+
+		ws: ws,
 	}
 
 	log.Printf("New Connection: %s", ws.RemoteAddr().String())
@@ -226,7 +239,9 @@ func (a App) handleSocketClient(conn *clientConnection, terminate chan struct{})
 				return err
 			}
 
-			log.Printf("Received data: %+v", data)
+			if data.Operation != hearthbeatResponseOperation {
+				log.Printf("Received data: %+v", data)
+			}
 
 			switch data.Operation {
 			case clientOperationSet:
@@ -246,20 +261,23 @@ func (a App) handleSocketClient(conn *clientConnection, terminate chan struct{})
 				op := liquiddb.EventOperation(data.Value.(string))
 				//TODO: can we optimize this strings join?
 				conn.RemoveInterest(strings.Join(data.Path, "."), op, data)
+			case hearthbeatResponseOperation:
+				conn.hearthbeatResponse <- struct{}{}
 			default:
 				//TODO: should we and how to notify the user about this
 				log.Println("read: ", fmt.Errorf("Invalid operation type: %s", data.Operation))
 			}
 
-			log.Printf("Processed data: %+v", data)
+			if data.Operation != hearthbeatResponseOperation {
+				log.Printf("Processed data: %+v", data)
+			}
 		}
 	}
 }
 
 func (a App) handleSocketHearthbeat(conn *clientConnection, terminate chan struct{}) error {
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-
+	//TODO: refactor this method a bit as it has become too large
+	//also refactor the whole file as it has also become too large
 	sendHearthbeat := func() error {
 		err := conn.WriteJSON(struct {
 			Operation string `json:"operation,omitempty"`
@@ -275,20 +293,88 @@ func (a App) handleSocketHearthbeat(conn *clientConnection, terminate chan struc
 		return nil
 	}
 
-	//send hearthbeat immediately after connected
-	if err := sendHearthbeat(); err != nil {
-		return err
+	getSingleHearthbeatLatency := func() (int32, error) {
+		sendTime := time.Now()
+		latencyResult := make(chan int32)
+		timeout := make(chan struct{})
+		t := time.NewTimer(30 * time.Second)
+		defer t.Stop()
+
+		go func() {
+			select {
+			case <-conn.hearthbeatResponse:
+			case <-t.C:
+				timeout <- struct{}{}
+				return
+			}
+
+			now := time.Now()
+
+			difference := now.Sub(sendTime).Nanoseconds()
+			latency := (difference / int64(time.Millisecond)) / 2
+			latencyResult <- int32(latency)
+		}()
+
+		if err := sendHearthbeat(); err != nil {
+			return 0, err
+		}
+
+		select {
+		case latency := <-latencyResult:
+			return latency, nil
+		case <-timeout:
+			return 0, errors.New("Hearthbeat timeout")
+		}
 	}
+
+	//send 3 quick hearthbeats after a connection is established
+	//to calculate latency asap
+	for i := 0; i < 3; i++ {
+		conn.latencyMutex.Lock()
+		latency, err := getSingleHearthbeatLatency()
+		if err != nil {
+			log.Printf("Initial hearthbeat #%d: %s", i, err)
+			return err
+		}
+
+		conn.latencyHistory[i] = latency
+		conn.latencyMutex.Unlock()
+	}
+
+	calculateLatency := func() {
+		conn.latency = (conn.latencyHistory[0] + conn.latencyHistory[1] + conn.latencyHistory[2]) / 3
+	}
+
+	conn.latencyMutex.Lock()
+	calculateLatency()
+	conn.latencyMutex.Unlock()
+
+	const pingInterval = 500 * time.Millisecond
+
+	timer := time.NewTimer(pingInterval)
+	defer timer.Stop()
 
 	for {
 		select {
 		case <-terminate:
 			return nil
-		case <-ticker.C:
-			if err := sendHearthbeat(); err != nil {
+		case <-timer.C:
+			latency, err := getSingleHearthbeatLatency()
+			if err != nil {
 				log.Printf("hearthbeat: %s", err)
 				return err
 			}
+
+			conn.latencyMutex.Lock()
+			//move the history of latencies to the left, leaving the last index to the new latency
+			conn.latencyHistory[0] = conn.latencyHistory[1]
+			conn.latencyHistory[1] = conn.latencyHistory[2]
+			conn.latencyHistory[2] = latency
+			calculateLatency()
+			conn.latencyMutex.Unlock()
+
+			timer.Stop()
+			timer.Reset(pingInterval)
 		}
 	}
 }

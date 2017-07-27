@@ -5,7 +5,8 @@ import { SocketEvent } from './SocketEvent';
 import {
     ClientData,
     ClientOperationSubscribe,
-    ClientOperationUnSubscribe
+    ClientOperationUnSubscribe,
+    ClientOperationHearthbeatResponse
 } from './ClientData';
 import {
     BaseEventData,
@@ -86,17 +87,21 @@ export class Socket extends ReconnectableWebSocket {
     }
 
     private processHearthbeatEventData(data: HearthbeatEventData) {
-        log.debug(`-OnHearthbeatSocketMessage-`);
-        log.debug(`Hearthbeat: ${JSON.stringify(data)}`);
+        log.verbose(`-OnHearthbeatSocketMessage-`);
+        log.verbose(`Hearthbeat: ${JSON.stringify(data)}`);
 
         this.serverTime = this.lastLocalTimeUpdate = utc(data.timestamp);
 
+        //TODO: should we handle all 3 initial hearthbeats
+        //or 1 is fine
         if (!this.ready()) {
             this.receivedHearthbeat = true;
             this.lastLocalTimeUpdate = utc();
 
             this.emit('ready');
         }
+
+        this.send({ operation: ClientOperationHearthbeatResponse });
     }
 
     private buildEventPath(path: string[], op: EventOperation, id: number) {
@@ -199,8 +204,14 @@ export class Socket extends ReconnectableWebSocket {
         const d = JSON.stringify(data);
         super.send(d);
 
-        log.debug('-Send message-');
-        log.debug(`Message: ${d}`);
+        if (data.operation !== ClientOperationHearthbeatResponse) {
+            log.debug('-Send message-');
+            log.debug(`Message: ${d}`);
+        } else {
+            //lets not spam the console since hearthbeats are pretty frequent
+            log.verbose('-Send message-');
+            log.verbose(`Message: ${d}`);
+        }
 
         return data.id;
     }
