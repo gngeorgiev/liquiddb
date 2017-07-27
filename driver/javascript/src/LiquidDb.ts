@@ -35,7 +35,7 @@ export class LiquidDb {
         this.reconnect();
 
         await new Promise(resolve => {
-            if (this.socket.ready) {
+            if (this.socket.ready()) {
                 return resolve(this);
             }
 

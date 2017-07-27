@@ -7,7 +7,7 @@ LiquidDb.configureLogger({
     level: LiquidDb.LogLevel[logLevel]
 });
 
-describe('basic', () => {
+describe('DB Basic', () => {
     it('should create with proper settings', () => {
         const db = new LiquidDb({ address: 'test' });
 
@@ -24,7 +24,7 @@ describe('basic', () => {
     });
 });
 
-describe('crud', () => {
+describe('DB Crud', () => {
     let db;
     let ref;
 
@@ -207,7 +207,7 @@ describe('crud', () => {
     });
 });
 
-describe('multiple connected sockets', () => {
+describe('DB multiple connected sockets', () => {
     const dbs = [];
 
     before(async () => {
@@ -231,7 +231,7 @@ describe('multiple connected sockets', () => {
     });
 });
 
-describe('reconnect', () => {
+describe('DB reconnect', () => {
     let db;
 
     before(async () => {
