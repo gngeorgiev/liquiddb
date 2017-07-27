@@ -3,3 +3,10 @@
     flex-flow: column;
     justify-content: space-between;
 }
+
+/* temporary workaround until I improve the terminal itself */
+.terminal-main-input {
+    font-family: 'Roboto';
+    font-weight: 500;
+    font-size: 16px;
+}

@@ -14,9 +14,14 @@ class Database extends Component {
         return (
             <div className="database-container">
                 <Terminal
+                    style={{
+                        maxHeight: 300,
+                        height: 300
+                    }}
                     msg="Write commands using the provided db object, a reference to a LiquidDb instance."
                     watchConsoleLogging={false}
                     startState="maximised"
+                    color="#BDBDBD"
                     commandPassThrough={(cmd, print) => {
                         this.props.executeDatabaseCode(
                             cmd.join(''),
