@@ -42,3 +42,7 @@
     width: 100%;
     height: 100%;
 }
+
+.grid-container > div {
+    margin-bottom: 15px;
+}

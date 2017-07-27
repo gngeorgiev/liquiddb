@@ -6,11 +6,7 @@ import rootReducer from './reducers';
 
 export const history = createHistory();
 
-const initialState = {
-    database: {
-        executionResult: ''
-    }
-};
+const initialState = {};
 const enhancers = [];
 const middleware = [thunk, routerMiddleware(history)];
 

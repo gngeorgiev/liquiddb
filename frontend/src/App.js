@@ -12,6 +12,7 @@ import List, { ListItem, ListItemText } from 'material-ui/List';
 import DashboardIcon from 'material-ui-icons/Dashboard';
 import MenuIcon from 'material-ui-icons/Menu';
 import StorageIcon from 'material-ui-icons/Storage';
+import Spinner from 'react-spinkit';
 
 import Dashboard from './containers/dashboard/dashboard.container';
 import Database from './containers/database/database.container';
@@ -93,7 +94,14 @@ class App extends Component {
             );
         }
 
-        return <div>Loading....</div>;
+        return (
+            <div>
+                <div>
+                    <Spinner name="double-bounce" />
+                </div>
+                <div>Loading...</div>
+            </div>
+        );
     }
 }
 

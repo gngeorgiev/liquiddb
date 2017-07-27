@@ -1,7 +1,5 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import Card, { CardActions, CardContent } from 'material-ui/Card';
-import Button from 'material-ui/Button';
 import Typography from 'material-ui/Typography';
 
 export default class ConnectionsCount extends Component {
@@ -12,13 +10,9 @@ export default class ConnectionsCount extends Component {
     render() {
         return (
             <div>
-                <Card>
-                    <CardContent>
-                        <Typography type="title">
-                            {this.props.count}
-                        </Typography>
-                    </CardContent>
-                </Card>
+                <Typography type="title">
+                    {this.props.count}
+                </Typography>
             </div>
         );
     }
