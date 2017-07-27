@@ -7,6 +7,7 @@ Is an in-memory database for JSON documents which provides notifications for **i
 
 - [x] Updates on insert, update, delete operations
 - [x] Reliable message/response link with ID per operation
+- [x] Latency compensation
 - [ ] Transactions
 - [ ] Persistence
 - [ ] Clustering
