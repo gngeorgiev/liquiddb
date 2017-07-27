@@ -12,10 +12,12 @@ import List, { ListItem, ListItemText } from 'material-ui/List';
 import DashboardIcon from 'material-ui-icons/Dashboard';
 import MenuIcon from 'material-ui-icons/Menu';
 import StorageIcon from 'material-ui-icons/Storage';
+import InsertChartIcon from 'material-ui-icons/InsertChart';
 import Spinner from 'react-spinkit';
 
 import Dashboard from './containers/dashboard/dashboard.container';
 import Database from './containers/database/database.container';
+import Stats from './containers/stats/stats.container';
 
 import './App.css';
 
@@ -75,6 +77,13 @@ class App extends Component {
                                     <StorageIcon />
                                     <ListItemText primary="Database" />
                                 </ListItem>
+                                <ListItem
+                                    button
+                                    onClick={() => this.props.goToStats()}
+                                >
+                                    <InsertChartIcon />
+                                    <ListItemText primary="Stats" />
+                                </ListItem>
                             </List>
                         </div>
                         <div className="main">
@@ -87,6 +96,11 @@ class App extends Component {
                                 exact
                                 path="/database"
                                 component={() => <Database />}
+                            />
+                            <Route
+                                exact
+                                path="/stats"
+                                component={() => <Stats />}
                             />
                         </div>
                     </div>
@@ -116,6 +130,7 @@ const mapDispatchToProps = dispatch =>
         {
             goToDashboard: () => push('/'),
             goToDatabase: () => push('/database'),
+            goToStats: () => push('/stats'),
             initializeDb: () => async dispatch => {
                 const db = await new LiquidDb().connect();
 

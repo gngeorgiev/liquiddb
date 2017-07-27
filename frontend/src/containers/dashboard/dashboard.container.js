@@ -32,7 +32,6 @@ class DashboardContainer extends Component {
                         <WidgetWrapper
                             title="Database View"
                             routeName="Database"
-                            width="100%"
                             actionPressed={() => this.props.goToDatabasePage()}
                         >
                             <DatabaseViewer
