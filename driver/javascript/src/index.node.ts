@@ -1,7 +1,7 @@
 import * as WebSocket from 'html5-websocket';
 
 import { LiquidDb, DbSettings } from './LiquidDb';
-import { LiquidDbStats } from './Stats/Stats';
+import { LiquidDbStats } from './stats/Stats';
 
 import { Dependencies } from './Dependencies';
 

@@ -1,0 +1,6 @@
+{
+  "name": "liquiddb-javascript-driver",
+  "dependencies": {
+    "oibackoff": "registry:dt/oibackoff#1.0.0+20161003183228"
+  }
+}

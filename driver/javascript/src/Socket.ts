@@ -1,4 +1,3 @@
-import { EventEmitter } from 'events';
 import * as MersenneTwister from 'mersenne-twister';
 import { utc, Moment } from 'moment';
 
@@ -15,71 +14,34 @@ import {
     HearthbeatEventData,
     EventOperationHearthbeat
 } from './EventData';
+import { ReconnectableWebSocket } from './ReconnectableWebSocket';
 
 import { logger } from './log';
 
 const log = logger('Socket');
 const javascriptUnixTimeLength = 13;
 
-export class Socket extends EventEmitter {
-    private socketOpen: boolean;
+export class Socket extends ReconnectableWebSocket {
     private receivedHearthbeat: boolean;
     private generator: MersenneTwister = new MersenneTwister();
     private events: Map<number, SocketEvent> = new Map();
     private serverTime: Moment;
     private lastLocalTimeUpdate: Moment;
-    private ws: WebSocket;
     private disconnectedQueue: ClientData[] = [];
-    private shouldAutoReconnect: boolean = true;
 
-    get ready(): boolean {
-        return this.socketOpen && this.receivedHearthbeat;
+    ready(): boolean {
+        return super.ready() && this.receivedHearthbeat;
     }
 
-    reconnect: () => Promise<any>;
-
-    constructor(private address: string, websocket: typeof WebSocket) {
-        super();
-        this.reconnect = () =>
-            new Promise(resolve => {
-                this.once('ready', () => {
-                    this.shouldAutoReconnect = true;
-                    resolve();
-                });
-                log.info('Reconnecting...');
-                this.initWebSocket(websocket);
-            });
-
-        this.reconnect();
+    constructor(address: string, websocket: typeof WebSocket) {
+        super(address, websocket);
     }
 
-    private initWebSocket(webSocket: typeof WebSocket) {
-        this.ws = new webSocket(this.address);
-        this.ws.onclose = this.onSocketClose.bind(this);
-        this.ws.onerror = this.onSocketError.bind(this);
-        this.ws.onopen = this.onSocketOpen.bind(this);
-        this.ws.onmessage = this.onSocketMessage.bind(this);
-    }
-
-    private onSocketClose() {
-        this.emit('close');
-
-        this.socketOpen = false;
+    onSocketClose() {
         this.receivedHearthbeat = false;
-        if (this.shouldAutoReconnect) {
-            this.reconnect();
-        }
     }
 
-    private onSocketError(error: Error) {
-        log.error(error);
-        this.onSocketClose();
-    }
-
-    private onSocketOpen() {
-        this.socketOpen = true;
-        log.info('Connected!');
-
+    onSocketOpen() {
         this.once('ready', () => {
             this.disconnectedQueue.forEach(d => this.send(d));
             this.disconnectedQueue = [];
@@ -95,7 +57,7 @@ export class Socket extends EventEmitter {
         });
     }
 
-    private onSocketMessage(msg: MessageEvent) {
+    onSocketMessage(msg: MessageEvent) {
         const data: BaseEventData = JSON.parse(msg.data);
         if (data.operation === EventOperationHearthbeat) {
             this.processHearthbeatEventData(data as HearthbeatEventData);
@@ -127,14 +89,14 @@ export class Socket extends EventEmitter {
         log.debug(`-OnHearthbeatSocketMessage-`);
         log.debug(`Hearthbeat: ${JSON.stringify(data)}`);
 
-        if (!this.receivedHearthbeat) {
+        this.serverTime = this.lastLocalTimeUpdate = utc(data.timestamp);
+
+        if (!this.ready()) {
             this.receivedHearthbeat = true;
             this.lastLocalTimeUpdate = utc();
 
             this.emit('ready');
         }
-
-        this.serverTime = this.lastLocalTimeUpdate = utc(data.timestamp);
     }
 
     private buildEventPath(path: string[], op: EventOperation, id: number) {
@@ -202,16 +164,12 @@ export class Socket extends EventEmitter {
         data.timestamp = data.timestamp || this.serverTime.toISOString();
     }
 
-    close(): Promise<any> {
-        return new Promise(async resolve => {
-            this.shouldAutoReconnect = false;
-            for (let event of this.events.values()) {
-                this.unsubscribeImpl(event);
-            }
+    async close(): Promise<any> {
+        for (let event of this.events.values()) {
+            this.unsubscribeImpl(event);
+        }
 
-            this.ws.close();
-            this.once('close', () => resolve());
-        });
+        await super.close();
     }
 
     sendWait(
@@ -231,7 +189,7 @@ export class Socket extends EventEmitter {
     }
 
     send(data: ClientData): number {
-        if (!this.ready) {
+        if (!this.ready()) {
             return this.disconnectedQueue.push(data);
         }
 
@@ -239,7 +197,7 @@ export class Socket extends EventEmitter {
         this.ensureClientDataFields(data);
 
         const d = JSON.stringify(data);
-        this.ws.send(d);
+        super.send(d);
 
         log.debug('-Send message-');
         log.debug(`Message: ${d}`);

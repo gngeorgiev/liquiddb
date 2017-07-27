@@ -1,6 +1,6 @@
 import { LiquidDb, DbSettings } from './LiquidDb';
 import { Dependencies } from './Dependencies';
-import { LiquidDbStats } from './Stats/Stats';
+import { LiquidDbStats } from './stats/Stats';
 
 const dependencies = { webSocket: WebSocket };
 

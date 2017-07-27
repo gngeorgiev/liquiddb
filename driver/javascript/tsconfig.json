@@ -2,7 +2,7 @@
     "compilerOptions": {
         "sourceMap": true,
         "lib": ["es2017", "dom"],
-        "typeRoots": ["node_modules/@types"],
+        "typeRoots": ["node_modules/@types", "typings/index.d.ts"],
         "downlevelIteration": true,
         "target": "es5",
         "declaration": true,

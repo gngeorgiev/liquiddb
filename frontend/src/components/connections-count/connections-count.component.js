@@ -4,7 +4,11 @@ import Typography from 'material-ui/Typography';
 
 export default class ConnectionsCount extends Component {
     static propTypes = {
-        count: PropTypes.number.isRequired
+        count: PropTypes.number
+    };
+
+    static defaultProps = {
+        count: 0
     };
 
     render() {

@@ -25,7 +25,6 @@ describe('Stats', () => {
             setTimeout(() => db.close() && done(), 100);
 
             assert.ok(d.connectionsCount > 0);
-            console.log(d.connectionsCount);
         });
 
         new LiquidDb().connect().then(d => (db = d));
@@ -38,7 +37,6 @@ describe('Stats', () => {
             setTimeout(() => db.close() && done(), 100);
 
             assert.ok(d.connectionsCount > 0);
-            console.log(d.connectionsCount);
         });
 
         stats.close();

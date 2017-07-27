@@ -22,12 +22,7 @@ export const dbStats = (state = {}, action) => {
     return state;
 };
 
-export const dbStatsData = (
-    state = {
-        connectionsCount: 0
-    },
-    action
-) => {
+export const dbStatsData = (state = {}, action) => {
     if (action.type === 'DB_STATS_DATA') {
         return action.data;
     }

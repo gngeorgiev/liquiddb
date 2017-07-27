@@ -132,7 +132,7 @@ const mapDispatchToProps = dispatch =>
             goToDatabase: () => push('/database'),
             goToStats: () => push('/stats'),
             initializeDb: () => async dispatch => {
-                const db = await new LiquidDb().connect();
+                const db = await new LiquidDb();
 
                 const refresh = async () => {
                     const data = await db.value();
@@ -142,16 +142,19 @@ const mapDispatchToProps = dispatch =>
                     });
                 };
 
+                db.data(refresh);
+
+                await db.connect();
+
                 dispatch({
                     type: 'INITIALIZE_DB',
                     db
                 });
 
-                db.data(refresh);
                 refresh();
             },
             initializeDbStats: () => async dispatch => {
-                const stats = await new LiquidDbStats().connect();
+                const stats = new LiquidDbStats();
 
                 stats.on('data', data => {
                     dispatch({
@@ -160,9 +163,11 @@ const mapDispatchToProps = dispatch =>
                     });
                 });
 
+                await stats.connect();
+
                 return dispatch({
                     type: 'INITIALIZE_DB_STATS',
-                    stats
+                    stats: {}
                 });
             }
         },

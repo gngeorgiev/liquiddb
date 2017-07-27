@@ -18,7 +18,12 @@ export class LiquidDb {
         private settings: DbSettings = {
             address: 'ws://localhost:8082/db'
         }
-    ) {}
+    ) {
+        this.socket = new Socket(
+            this.settings.address,
+            LiquidDb.dependencies.webSocket
+        );
+    }
 
     static configureLogger(conf: { level: LogLevel }) {
         configure(conf);
@@ -27,15 +32,7 @@ export class LiquidDb {
     static LogLevel: typeof LogLevel = LogLevel;
 
     async connect(): Promise<LiquidDb> {
-        if (this.socket) {
-            await this.reconnect();
-            return this;
-        }
-
-        this.socket = new Socket(
-            this.settings.address,
-            LiquidDb.dependencies.webSocket
-        );
+        this.reconnect();
 
         await new Promise(resolve => {
             if (this.socket.ready) {
