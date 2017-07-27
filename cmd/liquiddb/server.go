@@ -148,7 +148,7 @@ func (c *clientConnection) AddInterest(interest string, op liquiddb.EventOperati
 	//substract the latency from the interest, theoretically if an event happens
 	//at a certain time and the client has a X latency, he might not receive the event because
 	//the interest will be send later due to the latency
-	t.Add(time.Duration(-c.latency) * time.Millisecond)
+	t = t.Add(time.Duration(-c.latency) * time.Millisecond)
 
 	cInterest := &clientInterest{
 		o.ID,

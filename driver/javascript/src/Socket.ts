@@ -6,6 +6,7 @@ import {
     ClientData,
     ClientOperationSubscribe,
     ClientOperationUnSubscribe,
+    ClientOperationGet,
     ClientOperationHearthbeatResponse
 } from './ClientData';
 import {
@@ -25,7 +26,7 @@ const javascriptUnixTimeLength = 13;
 export class Socket extends ReconnectableWebSocket {
     private receivedHearthbeat: boolean;
     private generator: MersenneTwister = new MersenneTwister();
-    private events: Map<number, SocketEvent> = new Map();
+    private events: Map<number, SocketEvent[]> = new Map();
     private serverTime: Moment;
     private lastLocalTimeUpdate: Moment;
     private disconnectedQueue: ClientData[] = [];
@@ -47,13 +48,15 @@ export class Socket extends ReconnectableWebSocket {
             this.disconnectedQueue.forEach(d => this.send(d));
             this.disconnectedQueue = [];
 
-            for (let event of this.events.values()) {
-                this.subscribe(
-                    event.path,
-                    event.operation,
-                    event.id,
-                    event.callback
-                );
+            for (let events of this.events.values()) {
+                events.forEach(event => {
+                    this.subscribe(
+                        event.path,
+                        event.operation,
+                        event.id,
+                        event.callback
+                    );
+                });
             }
         });
     }
@@ -147,7 +150,12 @@ export class Socket extends ReconnectableWebSocket {
             id
         };
 
-        this.events.set(id, event);
+        //some operations use 0 as id
+        if (!this.events.has(id)) {
+            this.events.set(id, []);
+        }
+
+        this.events.get(id).push(event);
 
         return event;
     }
@@ -170,8 +178,8 @@ export class Socket extends ReconnectableWebSocket {
     }
 
     async close(): Promise<any> {
-        for (let event of this.events.values()) {
-            this.unsubscribeImpl(event);
+        for (let events of this.events.values()) {
+            events.forEach(ev => this.unsubscribeImpl(ev));
         }
 
         await super.close();
