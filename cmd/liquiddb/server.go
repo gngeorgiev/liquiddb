@@ -37,12 +37,16 @@ type operationClientData struct {
 }
 
 type clientConnections struct {
+	sync.Mutex
+
 	connectionAdded   chan *clientConnection
 	connectionRemoved chan *clientConnection
 	connections       []*clientConnection
 }
 
 var conns = clientConnections{
+	sync.Mutex{},
+
 	make(chan *clientConnection),
 	make(chan *clientConnection),
 	make([]*clientConnection, 0),
@@ -69,7 +73,9 @@ type clientConnection struct {
 func (c *clientConnection) close() error {
 	index := funk.IndexOf(conns.connections, c)
 	if index != -1 {
+		conns.Lock()
 		conns.connections = append(conns.connections[:index], conns.connections[index+1:]...)
+		conns.Unlock()
 	}
 
 	conns.connectionRemoved <- c
@@ -387,12 +393,19 @@ func (a App) handleSocketHearthbeat(conn *clientConnection, terminate chan struc
 func (a App) handleSocketClose(conn *clientConnection, terminate chan struct{}) error {
 	ch := make(chan error)
 
-	conn.ws.SetCloseHandler(func(code int, text string) error {
-		ch <- fmt.Errorf("Socket close %d %s", code, text)
-		return nil
-	})
+	go func() {
+		conn.ws.SetCloseHandler(func(code int, text string) error {
+			ch <- fmt.Errorf("Socket close %d %s", code, text)
+			return nil
+		})
+	}()
 
-	return <-ch
+	select {
+	case <-terminate:
+		return nil
+	case err := <-ch:
+		return err
+	}
 }
 
 func (a App) dbHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, r *http.Request) {
@@ -414,7 +427,7 @@ func (a App) dbHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, 
 			a.handleSocketClose,
 		}
 
-		terminateHandler := make(chan struct{})
+		terminateHandlers := make([]chan struct{}, len(handlers))
 		closeConnection := make(chan error)
 
 		var wg sync.WaitGroup
@@ -425,14 +438,15 @@ func (a App) dbHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, 
 			allHandlersTerminated <- struct{}{}
 		}()
 
-		for _, handler := range handlers {
-			go func(handler func(*clientConnection, chan struct{}) error) {
+		for i, handler := range handlers {
+			terminateHandlers[i] = make(chan struct{}, 1)
+			go func(handler func(*clientConnection, chan struct{}) error, terminateHandler chan struct{}) {
 				defer wg.Done()
 				err := handler(conn, terminateHandler)
 				if err != nil {
 					closeConnection <- err
 				}
-			}(handler)
+			}(handler, terminateHandlers[i])
 		}
 
 		go func() {
@@ -441,7 +455,9 @@ func (a App) dbHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, 
 				if !terminationSend {
 					terminationSend = true
 					//terminate all handlers
-					close(terminateHandler)
+					for _, h := range terminateHandlers {
+						h <- struct{}{}
+					}
 				}
 
 				if err != nil {

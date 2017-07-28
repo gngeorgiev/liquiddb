@@ -92,9 +92,7 @@ export class ReconnectableWebSocket extends EventEmitter {
     }
 
     private initWebSocket(webSocket: typeof WebSocket) {
-        if (this.ws) {
-            this.ws.onclose = this.ws.onopen = this.ws.onerror = this.ws.onmessage = this.ws = null;
-        }
+        this.disposeWebsocket();
 
         this.ws = new webSocket(this.address);
         this.ws.onclose = (...args) => {
@@ -123,12 +121,22 @@ export class ReconnectableWebSocket extends EventEmitter {
         this.ws.onmessage = this.onSocketMessage.bind(this);
     }
 
+    disposeWebsocket() {
+        this.socketOpen = false;
+
+        if (this.ws) {
+            this.ws.onclose = this.ws.onopen = this.ws.onerror = this.ws.onmessage = null;
+            this.ws.close();
+
+            this.ws = null;
+        }
+    }
+
     close(): Promise<any> {
         this.shouldAutoReconnect = false;
 
         return new Promise(resolve => {
-            this.ws.close();
-            this.socketOpen = false;
+            this.disposeWebsocket();
             resolve();
         });
     }
