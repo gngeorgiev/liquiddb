@@ -44,7 +44,7 @@ export class Socket extends ReconnectableWebSocket {
     }
 
     onSocketOpen() {
-        this.once('ready', () => {
+        const readyHandler = () => {
             this.disconnectedQueue.forEach(d => this.send(d));
             this.disconnectedQueue = [];
 
@@ -58,7 +58,13 @@ export class Socket extends ReconnectableWebSocket {
                     );
                 });
             }
-        });
+        };
+
+        if (this.ready()) {
+            readyHandler();
+        } else {
+            this.once('ready', readyHandler);
+        }
     }
 
     onSocketMessage(msg: MessageEvent) {
@@ -97,10 +103,8 @@ export class Socket extends ReconnectableWebSocket {
 
         //TODO: should we handle all 3 initial hearthbeats
         //or 1 is fine
-        if (!this.ready()) {
+        if (!this.receivedHearthbeat) {
             this.receivedHearthbeat = true;
-            this.lastLocalTimeUpdate = utc();
-
             this.emit('ready');
         }
 
@@ -112,11 +116,16 @@ export class Socket extends ReconnectableWebSocket {
         return path.concat(parts).join('.');
     }
 
-    private unsubscribeImpl(socketEvent: SocketEvent) {
+    private unsubscribeImpl(
+        socketEvent: SocketEvent,
+        removeEvent: boolean = true
+    ) {
         const { path, event, operation, id, callback } = socketEvent;
 
         this.removeListener(event, callback);
-        this.events.delete(id);
+        if (removeEvent) {
+            this.events.delete(id);
+        }
 
         this.send({
             id,
@@ -179,8 +188,10 @@ export class Socket extends ReconnectableWebSocket {
 
     async close(): Promise<any> {
         for (let events of this.events.values()) {
-            events.forEach(ev => this.unsubscribeImpl(ev));
+            events.forEach(ev => this.unsubscribeImpl(ev, false));
         }
+
+        this.receivedHearthbeat = false;
 
         await super.close();
     }

@@ -80,7 +80,7 @@ export class ReconnectableWebSocket extends EventEmitter {
                                 this.removeListener('close', closeListener);
                                 this.removeListener('ready', readyListener);
 
-                                return log.error(err);
+                                return log.error(err.toString());
                             }
                         },
                         () => {}
@@ -92,27 +92,31 @@ export class ReconnectableWebSocket extends EventEmitter {
     }
 
     private initWebSocket(webSocket: typeof WebSocket) {
+        if (this.ws) {
+            this.ws.onclose = this.ws.onopen = this.ws.onerror = this.ws.onmessage = this.ws = null;
+        }
+
         this.ws = new webSocket(this.address);
-        this.ws.onclose = () => {
-            log.error('Socket close');
+        this.ws.onclose = (...args) => {
+            const err = new Error(`Socket close ${args}`);
+            log.error(err);
 
             this.socketOpen = false;
-            this.emit('close', new Error('Socket closed'));
+            this.emit('close', err);
             this.onSocketClose();
         };
 
-        this.ws.onerror = (ev: Event) => {
-            log.error('Socket error');
-            log.error(ev);
+        this.ws.onerror = (...args) => {
+            log.error(`Socket error ${args}`);
+            this.socketOpen = false;
 
-            this.onSocketError(ev);
+            this.onSocketError(args[0]);
         };
 
         this.ws.onopen = () => {
             log.info('Socket open');
-            this.socketOpen = true;
 
-            this.emit('open');
+            this.socketOpen = true;
             this.onSocketOpen();
         };
 
@@ -124,7 +128,8 @@ export class ReconnectableWebSocket extends EventEmitter {
 
         return new Promise(resolve => {
             this.ws.close();
-            this.once('close', () => resolve());
+            this.socketOpen = false;
+            resolve();
         });
     }
 

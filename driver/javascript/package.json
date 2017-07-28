@@ -6,8 +6,6 @@
     "typings": "typings/index.node.d.ts",
     "scripts": {
         "test": "mocha test/",
-        "test-db": "mocha test/liquiddb.test.js",
-        "test-stats": "mocha test/liquiddb-stats.test.js",
         "build-web": "webpack --config webpack.config.web.js",
         "build-node": "webpack --config webpack.config.node.js"
     },

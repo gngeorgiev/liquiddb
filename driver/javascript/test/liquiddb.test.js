@@ -1,12 +1,6 @@
 const assert = require('assert');
 const { LiquidDb } = require('../');
 
-const logLevel = process.env.LIQUID_LOG_LEVEL || 'error';
-
-LiquidDb.configureLogger({
-    level: LiquidDb.LogLevel[logLevel]
-});
-
 describe('DB Basic', () => {
     it('should create with proper settings', () => {
         const db = new LiquidDb({ address: 'test' });
@@ -260,6 +254,7 @@ describe('DB reconnect', () => {
 
         db.set(dbVal).then(() => {
             db.data(d => {
+                console.log(d);
                 assert.equal(d.operation, 'update');
                 done();
             });

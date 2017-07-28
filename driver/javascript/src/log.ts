@@ -22,37 +22,53 @@ const logColors = {
 let logLevel: LogLevel = LogLevel.off;
 
 export function logger(component: string) {
-    const log = (data: any, level: LogLevel) => {
-        const levelNumber = LogLevel[logLevel] as any;
-        if (level > levelNumber) {
+    const log = (level: LogLevel, data: any) => {
+        if (level > logLevel) {
             return;
         }
 
-        const msg = typeof data === 'string' ? data : JSON.stringify(data);
+        let messages = data;
+        if (!Array.isArray(data)) {
+            messages = [data];
+        }
+
+        let message = '';
+        messages.forEach(m => {
+            let msg;
+            if (typeof data === 'string') {
+                msg = data;
+            } else if (data instanceof Error) {
+                msg = data.toString();
+            } else {
+                msg = JSON.stringify(data);
+            }
+
+            message += ` ${msg}`;
+        });
 
         const color = logColors[level];
         const levelString = LogLevel[level];
-        console.log(`${color(levelString)} ${component} | ${msg}`);
+        console.log(`${color(levelString)} ${component} | ${message}`);
     };
 
     return {
         fatal(msg: any) {
-            log(msg, LogLevel.fatal);
+            log(LogLevel.fatal, msg);
         },
         error(msg: any) {
-            log(msg, LogLevel.error);
+            log(LogLevel.error, msg);
         },
         warn(msg: any) {
-            log(msg, LogLevel.warning);
+            log(LogLevel.warning, msg);
         },
         info(msg: any) {
-            log(msg, LogLevel.information);
+            log(LogLevel.information, msg);
         },
         debug(msg: any) {
-            log(msg, LogLevel.debug);
+            log(LogLevel.debug, msg);
         },
         verbose(msg: any) {
-            log(msg, LogLevel.verbose);
+            log(LogLevel.verbose, msg);
         }
     };
 }
