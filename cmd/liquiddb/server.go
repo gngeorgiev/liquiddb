@@ -490,12 +490,12 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		ws, err := upgrader.Upgrade(w, r, nil)
-		defer ws.Close()
-
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+
+		defer ws.Close()
 
 		countCh := make(chan int)
 
