@@ -47,9 +47,10 @@ describe('Stats', () => {
             assert.ok(d.connectionsCount > 0);
         });
 
-        stats.close();
-        stats.reconnect();
-
-        new LiquidDb().connect().then(d => (db = d));
+        stats
+            .close()
+            .then(() => stats.reconnect())
+            .then(() => new LiquidDb().connect())
+            .then(d => (db = d));
     });
 });
