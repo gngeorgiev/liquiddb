@@ -70,6 +70,10 @@ type clientConnection struct {
 	ws *websocket.Conn
 }
 
+func (c *clientConnection) String() string {
+	return c.ws.RemoteAddr().String()
+}
+
 func (c *clientConnection) close() error {
 	index := funk.IndexOf(conns.connections, c)
 	if index != -1 {
@@ -304,63 +308,39 @@ func (a App) handleSocketHearthbeat(conn *clientConnection, terminate chan struc
 		return nil
 	}
 
-	getSingleHearthbeatLatency := func() (int32, error) {
+	getSingleHearthbeatLatency := func() (<-chan int32, <-chan error) {
 		sendTime := time.Now()
-		latencyResult := make(chan int32)
-		timeout := make(chan struct{})
-		t := time.NewTimer(30 * time.Second)
-		defer t.Stop()
+
+		latency := make(chan int32)
+		err := make(chan error)
 
 		go func() {
-			select {
-			case <-conn.hearthbeatResponse:
-			case <-t.C:
-				timeout <- struct{}{}
+			t := time.NewTimer(30 * time.Second)
+			defer t.Stop()
+
+			if hearthBeatError := sendHearthbeat(); hearthBeatError != nil {
+				err <- hearthBeatError
 				return
 			}
 
-			now := time.Now()
-
-			difference := now.Sub(sendTime).Nanoseconds()
-			latency := (difference / int64(time.Millisecond)) / 2
-			latencyResult <- int32(latency)
+			select {
+			case <-conn.hearthbeatResponse:
+				now := time.Now()
+				difference := now.Sub(sendTime).Nanoseconds()
+				latencyResult := (difference / int64(time.Millisecond)) / 2
+				latency <- int32(latencyResult)
+			case <-t.C:
+				err <- errors.New("Hearthbeat timeout")
+			}
 		}()
 
-		if err := sendHearthbeat(); err != nil {
-			return 0, err
-		}
-
-		select {
-		case latency := <-latencyResult:
-			return latency, nil
-		case <-timeout:
-			return 0, errors.New("Hearthbeat timeout")
-		}
+		return latency, err
 	}
-
-	//send 3 quick hearthbeats after a connection is established
-	//to calculate latency asap
-	for i := 0; i < 3; i++ {
-		conn.latencyMutex.Lock()
-		latency, err := getSingleHearthbeatLatency()
-		if err != nil {
-			log.Printf("Initial hearthbeat #%d: %s", i, err)
-			return err
-		}
-
-		conn.latencyHistory[i] = latency
-		conn.latencyMutex.Unlock()
-	}
-
-	calculateLatency := func() {
-		conn.latency = (conn.latencyHistory[0] + conn.latencyHistory[1] + conn.latencyHistory[2]) / 3
-	}
-
-	conn.latencyMutex.Lock()
-	calculateLatency()
-	conn.latencyMutex.Unlock()
 
 	const pingInterval = 500 * time.Millisecond
+	const initialPingsInterval = 5 * time.Millisecond
+
+	pingsSend := 0
 
 	timer := time.NewTimer(pingInterval)
 	defer timer.Stop()
@@ -370,22 +350,35 @@ func (a App) handleSocketHearthbeat(conn *clientConnection, terminate chan struc
 		case <-terminate:
 			return nil
 		case <-timer.C:
-			latency, err := getSingleHearthbeatLatency()
-			if err != nil {
-				log.Printf("hearthbeat: %s", err)
-				return err
+			latencyResult, errResult := getSingleHearthbeatLatency()
+			select {
+			case <-terminate:
+				return nil
+			case latency := <-latencyResult:
+				conn.latencyMutex.Lock()
+				//move the history of latencies to the left, leaving the last index to the new latency
+				conn.latencyHistory[0] = conn.latencyHistory[1]
+				conn.latencyHistory[1] = conn.latencyHistory[2]
+				conn.latencyHistory[2] = latency
+				conn.latency = (conn.latencyHistory[0] + conn.latencyHistory[1] + conn.latencyHistory[2]) / 3
+				conn.latencyMutex.Unlock()
+
+				timer.Stop()
+
+				//send 3 quick hearthbeats after a connection is established
+				//to calculate latency asap
+				if pingsSend < 3 {
+					pingsSend++
+					timer.Reset(initialPingsInterval)
+				} else {
+					timer.Reset(pingInterval)
+				}
+			case err := <-errResult:
+				if err != nil {
+					log.Printf("hearthbeat: %s", err)
+					return err
+				}
 			}
-
-			conn.latencyMutex.Lock()
-			//move the history of latencies to the left, leaving the last index to the new latency
-			conn.latencyHistory[0] = conn.latencyHistory[1]
-			conn.latencyHistory[1] = conn.latencyHistory[2]
-			conn.latencyHistory[2] = latency
-			calculateLatency()
-			conn.latencyMutex.Unlock()
-
-			timer.Stop()
-			timer.Reset(pingInterval)
 		}
 	}
 }
@@ -427,26 +420,20 @@ func (a App) dbHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, 
 			a.handleSocketClose,
 		}
 
-		terminateHandlers := make([]chan struct{}, len(handlers))
+		terminateHandler := make(chan struct{}, len(handlers))
 		closeConnection := make(chan error)
 
 		var wg sync.WaitGroup
 		wg.Add(len(handlers))
-		allHandlersTerminated := make(chan struct{})
-		go func() {
-			wg.Wait()
-			allHandlersTerminated <- struct{}{}
-		}()
 
-		for i, handler := range handlers {
-			terminateHandlers[i] = make(chan struct{}, 1)
+		for _, handler := range handlers {
 			go func(handler func(*clientConnection, chan struct{}) error, terminateHandler chan struct{}) {
 				defer wg.Done()
 				err := handler(conn, terminateHandler)
 				if err != nil {
 					closeConnection <- err
 				}
-			}(handler, terminateHandlers[i])
+			}(handler, terminateHandler)
 		}
 
 		go func() {
@@ -455,23 +442,21 @@ func (a App) dbHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, 
 				if !terminationSend {
 					terminationSend = true
 					//terminate all handlers
-					for _, h := range terminateHandlers {
-						h <- struct{}{}
+					for i := 0; i < len(handlers); i++ {
+						terminateHandler <- struct{}{}
 					}
 				}
 
 				if err != nil {
 					//log all errors
 					log.Println(err)
-				} else {
-					return
 				}
 			}
 		}()
 
-		<-allHandlersTerminated
-		closeConnection <- nil
-		log.Printf("Closed connection: %s", ws.RemoteAddr().String())
+		wg.Wait()
+		close(closeConnection)
+		log.Printf("Closed connection: %s", conn.String())
 	}
 }
 
@@ -505,6 +490,8 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		ws, err := upgrader.Upgrade(w, r, nil)
+		defer ws.Close()
+
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -513,11 +500,10 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 		countCh := make(chan int)
 
 		defer func() {
-			close(countCh)
-
 			connectionsCountsMutex.Lock()
 			index := funk.IndexOf(connectionsCounts, countCh)
 			connectionsCounts = append(connectionsCounts[:index], connectionsCounts[index+1:]...)
+			close(countCh)
 			connectionsCountsMutex.Unlock()
 		}()
 
@@ -540,7 +526,6 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 				}
 			}
 		}
-
 	}
 }
 

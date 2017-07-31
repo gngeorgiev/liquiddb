@@ -39,7 +39,9 @@ export class LiquidDb {
                 return resolve(this);
             }
 
-            this.socket.once('ready', () => resolve(this));
+            this.socket.once('ready', () => {
+                resolve(this);
+            });
         });
 
         return this;

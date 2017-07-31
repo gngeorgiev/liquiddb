@@ -225,7 +225,7 @@ describe('DB multiple connected sockets', () => {
     });
 });
 
-describe.only('DB reconnect', () => {
+describe('DB reconnect', () => {
     let db;
 
     before(async () => {
@@ -236,7 +236,7 @@ describe.only('DB reconnect', () => {
         db.close();
     });
 
-    it.only('Should execute operation after reconnection', done => {
+    it('Should execute operation after reconnection', done => {
         db.close().then(async () => {
             const dbVal = { test: 1 };
             db.set(dbVal);

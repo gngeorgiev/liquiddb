@@ -16,19 +16,33 @@ describe('Stats', () => {
         let db;
 
         stats.once('data', d => {
-            setTimeout(() => db.close() && done(), 100);
+            const interval = setInterval(() => {
+                if (db) {
+                    clearInterval(interval);
+                    db.close();
+                    done();
+                }
+            }, 100);
 
             assert.ok(d.connectionsCount > 0);
         });
 
-        new LiquidDb().connect().then(d => (db = d));
+        new LiquidDb().connect().then(d => {
+            db = d;
+        });
     });
 
     it('Should reconnect and get data', done => {
         let db;
 
         stats.once('data', d => {
-            setTimeout(() => db.close() && done(), 100);
+            const interval = setInterval(() => {
+                if (db) {
+                    clearInterval(interval);
+                    db.close();
+                    done();
+                }
+            }, 100);
 
             assert.ok(d.connectionsCount > 0);
         });
