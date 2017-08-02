@@ -3,10 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
+
+	log "github.com/sirupsen/logrus"
 
 	"time"
 
@@ -59,7 +60,8 @@ type clientInterest struct {
 }
 
 type clientConnection struct {
-	mu        sync.Mutex
+	sync.Mutex
+
 	interests map[string][]*clientInterest
 
 	latencyMutex       sync.Mutex
@@ -75,21 +77,39 @@ func (c *clientConnection) String() string {
 }
 
 func (c *clientConnection) close() error {
-	index := funk.IndexOf(conns.connections, c)
-	if index != -1 {
-		conns.Lock()
-		conns.connections = append(conns.connections[:index], conns.connections[index+1:]...)
-		conns.Unlock()
+	c.Lock()
+	defer c.Unlock()
+
+	conns.Lock()
+	defer conns.Unlock()
+
+	index := -1
+	for i, conn := range conns.connections {
+		if conn == c {
+			index = i
+			break
+		}
 	}
 
-	conns.connectionRemoved <- c
+	// log.WithFields(log.Fields{
+	// 	"index": index,
+	// 	"len":   len(conns.connections),
+	// })
+	if index != -1 {
+		conns.connections = append(conns.connections[:index], conns.connections[index+1:]...)
+		conns.connectionRemoved <- c
+	}
 
 	return c.ws.Close()
 }
 
 func newClientConnection(ws *websocket.Conn) *clientConnection {
+	conns.Lock()
+	defer conns.Unlock()
+
 	c := &clientConnection{
-		mu:        sync.Mutex{},
+		Mutex: sync.Mutex{},
+
 		interests: map[string][]*clientInterest{},
 
 		latencyMutex:       sync.Mutex{},
@@ -100,7 +120,7 @@ func newClientConnection(ws *websocket.Conn) *clientConnection {
 		ws: ws,
 	}
 
-	log.Printf("New Connection: %s", ws.RemoteAddr().String())
+	log.WithField("address", ws.RemoteAddr().String()).Info("New Connection")
 
 	conns.connectionAdded <- c
 	conns.connections = append(conns.connections, c)
@@ -109,8 +129,8 @@ func newClientConnection(ws *websocket.Conn) *clientConnection {
 }
 
 func (c *clientConnection) WriteInterested(path string, o liquiddb.EventData) (bool, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.Lock()
+	defer c.Unlock()
 
 	op := o.Operation
 
@@ -124,24 +144,24 @@ func (c *clientConnection) WriteInterested(path string, o liquiddb.EventData) (b
 	}
 
 	for _, interest := range interests {
+		log.WithFields(log.Fields{
+			"id":        interest.id,
+			"operation": interest.operation,
+			"timestamp": interest.timestamp,
+		}).Debug("Interest")
+
 		interestHasValidTimestamp := o.Timestamp.After(interest.timestamp) || o.Timestamp.Equal(interest.timestamp)
 		if interest.operation == op && interestHasValidTimestamp {
 			return true, c.ws.WriteJSON(o)
 		}
 	}
 
-	log.Println("Didn't send, no matching time")
-	log.Printf("Operation timestamp %s", o.Timestamp)
-	for _, interest := range interests {
-		log.Printf("Interest %d - %s - %s", interest.id, interest.operation, interest.timestamp)
-	}
-
 	return false, nil
 }
 
 func (c *clientConnection) AddInterest(interest string, op liquiddb.EventOperation, o operationClientData) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.Lock()
+	defer c.Unlock()
 
 	timestamp := o.Timestamp
 
@@ -175,8 +195,8 @@ func (c *clientConnection) AddInterest(interest string, op liquiddb.EventOperati
 }
 
 func (c *clientConnection) WriteJSON(o interface{}) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.Lock()
+	defer c.Unlock()
 
 	return c.ws.WriteJSON(o)
 }
@@ -186,8 +206,8 @@ func (c *clientConnection) ReadJSON(o interface{}) error {
 }
 
 func (c *clientConnection) RemoveInterest(interest string, op liquiddb.EventOperation, o operationClientData) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.Lock()
+	defer c.Unlock()
 
 	if interest == "" {
 		interest = liquiddb.TreeRoot
@@ -195,7 +215,10 @@ func (c *clientConnection) RemoveInterest(interest string, op liquiddb.EventOper
 
 	interests := c.interests[interest]
 	if interests == nil || len(interests) == 0 {
-		log.Printf("Trying to remove unexisting interest: %s, %s", interest, op)
+		log.WithFields(log.Fields{
+			"interest":  interest,
+			"operation": op,
+		}).Warn("Trying to remove unexisting interest")
 		return
 	}
 
@@ -227,13 +250,13 @@ func (a App) handleSocketStoreNotify(conn *clientConnection, terminate chan stru
 			//I should probably just keep path in both forms - string and slice
 			send, err := conn.WriteInterested(strings.Join(op.Path, "."), op)
 			if send {
-				log.Printf("Sending data: %+v", op)
+				log.WithField("data", op).Debug("Sending data")
 			} else {
-				log.Printf("Did not send data because not interested: %+v", op)
+				log.WithField("operation", op).Debug("Did not send data because not interested")
 			}
 
 			if err != nil {
-				log.Println("write: ", err)
+				log.WithField("category", "write").Error(err)
 				return err
 			}
 		}
@@ -250,12 +273,12 @@ func (a App) handleSocketClient(conn *clientConnection, terminate chan struct{})
 			err := conn.ReadJSON(&data)
 			if err != nil {
 				//TODO: try to write one last error to the ws connection before closing it
-				log.Println("read: ", err)
+				log.WithField("category", "read").Error(err)
 				return err
 			}
 
 			if data.Operation != hearthbeatResponseOperation {
-				log.Printf("Received data: %+v", data)
+				log.WithField("data", data).Debug("Received data")
 			}
 
 			switch data.Operation {
@@ -269,7 +292,7 @@ func (a App) handleSocketClient(conn *clientConnection, terminate chan struct{})
 				op := liquiddb.EventOperation(data.Value.(string))
 				//TODO: can we optimize this strings join?
 				if err := conn.AddInterest(strings.Join(data.Path, "."), op, data); err != nil {
-					log.Println("add interest: ", err)
+					log.WithField("category", "add interest").Error(err)
 					return err
 				}
 			case clientOperationUnSubscribe:
@@ -280,11 +303,14 @@ func (a App) handleSocketClient(conn *clientConnection, terminate chan struct{})
 				conn.hearthbeatResponse <- struct{}{}
 			default:
 				//TODO: should we and how to notify the user about this
-				log.Println("read: ", fmt.Errorf("Invalid operation type: %s", data.Operation))
+				log.WithFields(log.Fields{
+					"category":  "read",
+					"operation": data.Operation,
+				}).Error("Invalid operation type")
 			}
 
 			if data.Operation != hearthbeatResponseOperation {
-				log.Printf("Processed data: %+v", data)
+				log.WithField("data", data).Debug("Processed data")
 			}
 		}
 	}
@@ -315,7 +341,7 @@ func (a App) handleSocketHearthbeat(conn *clientConnection, terminate chan struc
 		err := make(chan error)
 
 		go func() {
-			t := time.NewTimer(30 * time.Second)
+			t := time.NewTimer(10 * time.Second)
 			defer t.Stop()
 
 			if hearthBeatError := sendHearthbeat(); hearthBeatError != nil {
@@ -342,7 +368,7 @@ func (a App) handleSocketHearthbeat(conn *clientConnection, terminate chan struc
 
 	pingsSend := 0
 
-	timer := time.NewTimer(pingInterval)
+	timer := time.NewTimer(initialPingsInterval)
 	defer timer.Stop()
 
 	for {
@@ -375,9 +401,10 @@ func (a App) handleSocketHearthbeat(conn *clientConnection, terminate chan struc
 				}
 			case err := <-errResult:
 				if err != nil {
-					log.Printf("hearthbeat: %s", err)
-					return err
+					log.WithField("category", "heartbeat").Error(err)
 				}
+
+				return err
 			}
 		}
 	}
@@ -386,12 +413,19 @@ func (a App) handleSocketHearthbeat(conn *clientConnection, terminate chan struc
 func (a App) handleSocketClose(conn *clientConnection, terminate chan struct{}) error {
 	ch := make(chan error)
 
-	go func() {
-		conn.ws.SetCloseHandler(func(code int, text string) error {
-			ch <- fmt.Errorf("Socket close %d %s", code, text)
-			return nil
-		})
-	}()
+	conn.Lock()
+
+	conn.ws.SetCloseHandler(func(code int, text string) error {
+		go func() {
+			socketCloseErr := fmt.Errorf("Socket close %d %s", code, text)
+			log.WithField("category", "socket close").Error(socketCloseErr)
+			ch <- socketCloseErr
+		}()
+
+		return nil
+	})
+
+	conn.Unlock()
 
 	select {
 	case <-terminate:
@@ -411,52 +445,51 @@ func (a App) dbHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, 
 
 		conn := newClientConnection(ws)
 
-		defer conn.close()
+		defer func() {
+			err := conn.close()
+			if err != nil {
+				log.WithField("category", "close ws connection").Error(err)
+			}
+		}()
 
-		handlers := []func(*clientConnection, chan struct{}) error{
-			a.handleSocketStoreNotify,
-			a.handleSocketClient,
-			a.handleSocketHearthbeat,
-			a.handleSocketClose,
+		handlers := map[string]func(*clientConnection, chan struct{}) error{
+			"handleSocketStoreNotify": a.handleSocketStoreNotify,
+			"handleSocketClient":      a.handleSocketClient,
+			"handleSocketHearthbeat":  a.handleSocketHearthbeat,
+			"handleSocketClose":       a.handleSocketClose,
 		}
 
 		terminateHandler := make(chan struct{}, len(handlers))
-		closeConnection := make(chan error)
+		closeConnection := make(chan struct{}, len(handlers))
 
 		var wg sync.WaitGroup
 		wg.Add(len(handlers))
 
-		for _, handler := range handlers {
-			go func(handler func(*clientConnection, chan struct{}) error, terminateHandler chan struct{}) {
+		for handlerName, handler := range handlers {
+			go func(handlerName string, handler func(*clientConnection, chan struct{}) error, terminateHandler chan struct{}) {
 				defer wg.Done()
 				err := handler(conn, terminateHandler)
-				if err != nil {
-					closeConnection <- err
-				}
-			}(handler, terminateHandler)
+				log.WithFields(log.Fields{
+					"category":    "handler returned",
+					"handlerName": handlerName,
+					"connection":  conn.String(),
+				}).Info(err)
+
+				closeConnection <- struct{}{}
+			}(handlerName, handler, terminateHandler)
 		}
 
 		go func() {
-			terminationSend := false
-			for err := range closeConnection {
-				if !terminationSend {
-					terminationSend = true
-					//terminate all handlers
-					for i := 0; i < len(handlers); i++ {
-						terminateHandler <- struct{}{}
-					}
-				}
-
-				if err != nil {
-					//log all errors
-					log.Println(err)
-				}
+			<-closeConnection
+			//terminate all handlers
+			for i := 0; i < len(handlers); i++ {
+				terminateHandler <- struct{}{}
 			}
 		}()
 
 		wg.Wait()
 		close(closeConnection)
-		log.Printf("Closed connection: %s", conn.String())
+		log.WithField("connection", conn.String()).Info("Closed connection")
 	}
 }
 
@@ -470,9 +503,13 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 
 	go func() {
 		updateConnectionsCount := func() {
-			l := len(conns.connections)
 			connectionsCountsMutex.Lock()
 			defer connectionsCountsMutex.Unlock()
+
+			conns.Lock()
+			defer conns.Unlock()
+
+			l := len(conns.connections)
 			for _, ch := range connectionsCounts {
 				ch <- l
 			}
@@ -513,7 +550,7 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 
 		//send the stats on the initial connection
 		if err := ws.WriteJSON(stats{len(conns.connections)}); err != nil {
-			log.Println(err)
+			log.WithField("category", "write initial stats").Error(err)
 			return
 		}
 
@@ -521,7 +558,7 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 			select {
 			case c := <-countCh:
 				if err := ws.WriteJSON(stats{c}); err != nil {
-					log.Println(err)
+					log.WithField("category", "write stats").Error(err)
 					return
 				}
 			}
@@ -532,6 +569,12 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 const serverPort = ":8082"
 
 func (a App) startServer() error {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Fatal(r)
+		}
+	}()
+
 	upgrader := websocket.Upgrader{}
 	upgrader.CheckOrigin = func(r *http.Request) bool {
 		return true
@@ -544,6 +587,6 @@ func (a App) startServer() error {
 
 	handler := cors.AllowAll().Handler(mux)
 
-	log.Printf("Listening on port %s", serverPort)
+	log.WithField("port", serverPort).Info("Server Listening")
 	return http.ListenAndServe(serverPort, handler)
 }

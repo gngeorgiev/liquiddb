@@ -1,7 +1,9 @@
 package main
 
 import (
-	"log"
+	"os"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/gngeorgiev/liquiddb"
 )
@@ -17,7 +19,9 @@ func main() {
 		db: liquiddb.New(),
 	}
 
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.SetFormatter(&log.TextFormatter{})
+	log.SetOutput(os.Stdout)
+	log.SetLevel(log.InfoLevel)
 
 	log.Fatal(app.startServer())
 }

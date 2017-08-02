@@ -1,10 +1,12 @@
-hash: 98e1afbc3f545e8bfa53349ea04b5fe312ca40296d36b00bd530412fc0645846
-updated: 2017-07-25T15:43:05.139691094+03:00
+hash: a4e21a0f5db21b37ef71e15e19ce252a64154cecc2b3e5767e4744e1e89ed88e
+updated: 2017-08-02T17:45:23.679007123+03:00
 imports:
 - name: github.com/gorilla/websocket
   version: ea4d1f681babbce9545c9c5f3d5194a789c89f5b
 - name: github.com/rs/cors
-  version: 8dd4211afb5d08dbb39a533b9bb9e4b486351df6
+  version: 7af7a1e09ba336d2ea14b1ce73bf693c6837dbf6
+- name: github.com/sirupsen/logrus
+  version: a3f95b5c423586578a4e099b11a46c2479628cac
 - name: github.com/thoas/go-funk
   version: 14304e8530de7dbb909c8305591b3a8370dd9dbb
 testImports: []
