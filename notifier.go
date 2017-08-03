@@ -51,13 +51,20 @@ type notifier struct {
 	sync.Mutex
 	handlers    map[EventOperation][]chan<- EventData
 	handlersMap map[chan<- EventData][]EventOperation
+
+	notifyChannel chan EventData
 }
 
 func newNotifier() *notifier {
-	return &notifier{
-		handlers:    make(map[EventOperation][]chan<- EventData),
-		handlersMap: make(map[chan<- EventData][]EventOperation),
+	n := &notifier{
+		handlers:      make(map[EventOperation][]chan<- EventData),
+		handlersMap:   make(map[chan<- EventData][]EventOperation),
+		notifyChannel: make(chan EventData, 10),
 	}
+
+	go n.notifyLoop()
+
+	return n
 }
 
 func (n *notifier) Notify(c chan<- EventData, operations ...EventOperation) error {
@@ -105,15 +112,23 @@ func (n *notifier) StopNotify(c chan<- EventData) error {
 	return nil
 }
 
+//TODO: does this need to stop at all?
+func (n *notifier) notifyLoop() {
+	for {
+		notification := <-n.notifyChannel
+
+		for _, c := range n.handlers[notification.Operation] {
+			c <- notification
+		}
+	}
+}
+
 func (n *notifier) notifyInternal(notifications ...EventData) {
 	n.Lock()
 	defer n.Unlock()
 
 	for _, notification := range notifications {
 		notification.Timestamp = time.Now().UTC()
-		for _, c := range n.handlers[notification.Operation] {
-			c <- notification
-		}
+		n.notifyChannel <- notification
 	}
-
 }
