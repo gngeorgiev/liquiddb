@@ -13,7 +13,7 @@ class Stats extends Component {
                     <Col md={4}>
                         <WidgetWrapper title="Connections">
                             <ConnectionsCount
-                                count={this.props.dbStats.connectionsCount}
+                                count={this.props.dbStats.connections.length}
                             />
                         </WidgetWrapper>
                     </Col>

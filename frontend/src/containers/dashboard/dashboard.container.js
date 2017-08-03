@@ -22,7 +22,7 @@ class DashboardContainer extends Component {
                             actionPressed={() => this.props.goToStatsPage()}
                         >
                             <ConnectionsCount
-                                count={this.props.dbStats.connectionsCount}
+                                count={this.props.dbStats.connections.length}
                             />
                         </WidgetWrapper>
                     </Col>

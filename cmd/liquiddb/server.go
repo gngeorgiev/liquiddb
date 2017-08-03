@@ -103,23 +103,33 @@ func (a App) dbHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, 
 }
 
 type stats struct {
-	ConnectionsCount int `json:"connectionsCount,omitempty"`
+	Connections []string `json:"connections,omitempty"`
 }
 
 func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, r *http.Request) {
-	var connectionsCountsMutex deadlock.Mutex
-	connectionsCounts := make([]chan int, 0)
+	var connectionsChannelsMutex deadlock.Mutex
+	connectionsChannels := make([]chan []string, 0)
+
+	updateConnections := func() {
+		clientConnections := clientConnectionsPool.Connections()
+		connectionsInfo := make([]string, len(clientConnections))
+		for i, c := range clientConnections {
+			connectionsInfo[i] = c.String()
+		}
+
+		connectionsChannelsMutex.Lock()
+
+		for _, ch := range connectionsChannels {
+			ch <- connectionsInfo
+		}
+
+		connectionsChannelsMutex.Unlock()
+	}
 
 	go func() {
 		for {
-			count := <-clientConnectionsPool.connectionsUpdated
-			connectionsCountsMutex.Lock()
-
-			for _, ch := range connectionsCounts {
-				ch <- count
-			}
-
-			connectionsCountsMutex.Unlock()
+			<-clientConnectionsPool.connectionsUpdated
+			updateConnections()
 		}
 	}()
 
@@ -132,43 +142,33 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 
 		defer ws.Close()
 
-		countCh := make(chan int)
+		connectionsChannel := make(chan []string)
 
 		defer func() {
-			connectionsCountsMutex.Lock()
-			defer connectionsCountsMutex.Unlock()
+			connectionsChannelsMutex.Lock()
+			defer connectionsChannelsMutex.Unlock()
 
 			index := -1
-			for i, ch := range connectionsCounts {
-				if ch == countCh {
+			for i, ch := range connectionsChannels {
+				if ch == connectionsChannel {
 					index = i
 				}
 			}
 
 			if index != -1 {
-				connectionsCounts = append(connectionsCounts[:index], connectionsCounts[index+1:]...)
+				connectionsChannels = append(connectionsChannels[:index], connectionsChannels[index+1:]...)
 			} else {
 				log.Error("Stats count channel not found in collection")
 			}
 
-			close(countCh)
+			close(connectionsChannel)
 		}()
 
-		connectionsCountsMutex.Lock()
-		connectionsCounts = append(connectionsCounts, countCh)
-		connectionsCountsMutex.Unlock()
-
-		connectionsCount := clientConnectionsPool.Len()
-
-		//send the stats on the initial connection
-		if err := ws.WriteJSON(stats{connectionsCount}); err != nil {
-			log.WithField("category", "write initial stats").Error(err)
-			return
-		}
+		go updateConnections()
 
 		for {
 			select {
-			case c := <-countCh:
+			case c := <-connectionsChannel:
 				if err := ws.WriteJSON(stats{c}); err != nil {
 					log.WithField("category", "write stats").Error(err)
 					return

@@ -8,7 +8,7 @@ export const history = createHistory();
 
 const initialState = {
     dbStatsData: {
-        connectionsCount: 0
+        connections: []
     }
 };
 const enhancers = [];
