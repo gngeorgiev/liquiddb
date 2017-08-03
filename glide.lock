@@ -1,12 +1,22 @@
-hash: a4cabb066cfaceec210c81cac07d2ffee81c874f91e342eb6dc0ed34b1d13149
-updated: 2017-07-25T15:43:54.916647923+03:00
+hash: 43ccf7a2db1c62694458963e55ae6f47db3876c8ddd6924143e3d2bc930b8453
+updated: 2017-08-03T17:03:10.13119062+03:00
 imports:
 - name: github.com/go-errors/errors
   version: 8fa88b06e5974e97fbf9899a7f86a344bfd1f105
 - name: github.com/gorilla/websocket
   version: ea4d1f681babbce9545c9c5f3d5194a789c89f5b
+- name: github.com/orcaman/concurrent-map
+  version: 2ae17bc4c860c83513ee50feb9746f3e50d7515d
 - name: github.com/rs/cors
-  version: 8dd4211afb5d08dbb39a533b9bb9e4b486351df6
+  version: 7af7a1e09ba336d2ea14b1ce73bf693c6837dbf6
+- name: github.com/sasha-s/go-deadlock
+  version: 09aefc0ac06ad74d91ca31acdb11fc981c159149
+- name: github.com/sirupsen/logrus
+  version: a3f95b5c423586578a4e099b11a46c2479628cac
 - name: github.com/thoas/go-funk
   version: 14304e8530de7dbb909c8305591b3a8370dd9dbb
+- name: golang.org/x/sys
+  version: d6c3f2be455466eedffcfc91793e2c808b7a7410
+  subpackages:
+  - unix
 testImports: []

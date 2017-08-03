@@ -19,44 +19,6 @@ type normalizedData struct {
 	value interface{}
 }
 
-//Node is a node in the tree
-type Node struct {
-	Key      string
-	Value    interface{}
-	Parent   *Node
-	Path     []string
-	Children map[string]*Node
-
-	pristine bool
-}
-
-//newNode creates a new node in the tree
-func newNode(key string, parent *Node) *Node {
-	var parentPath []string
-	if parent == nil || parent.Key == TreeRoot {
-		parentPath = []string{}
-	} else {
-		parentPath = parent.Path
-	}
-
-	node := &Node{
-		Key:      key,
-		Value:    nil,
-		Parent:   parent,
-		Children: map[string]*Node{},
-		Path:     append(parentPath, key),
-
-		pristine: true,
-	}
-
-	if parent != nil {
-		parent.Children[node.Key] = node
-		parent.Value = nil
-	}
-
-	return node
-}
-
 type tree struct {
 	root *Node
 }
@@ -111,7 +73,7 @@ func (t tree) findNode(path []string, autoCreate bool) *Node {
 
 		key := path[0]
 		path = path[1:]
-		if _, ok := node.Children[key]; !ok {
+		if _, ok := node.Children.Get(key); !ok {
 			if autoCreate {
 				newNode(key, node)
 			} else {
@@ -119,7 +81,8 @@ func (t tree) findNode(path []string, autoCreate bool) *Node {
 			}
 		}
 
-		node = node.Children[key]
+		n, _ := node.Children.Get(key)
+		node = n.(*Node)
 	}
 
 	return node
@@ -131,12 +94,13 @@ func (t tree) performOnNodes(data []normalizedData) []EventData {
 	for _, d := range data {
 		for i := range d.key {
 			node := t.findNode(d.key[:i+1], true)
+
 			if node.Key == d.key[len(d.key)-1] {
-				node.Value = d.value
+				node.SetValue(d.value)
 			}
 
 			var op EventOperation
-			if node.pristine && node.Key != TreeRoot {
+			if node.GetPristine() && node.Key != TreeRoot {
 				op = EventOperationInsert
 			} else {
 				op = EventOperationUpdate
@@ -146,12 +110,12 @@ func (t tree) performOnNodes(data []normalizedData) []EventData {
 				Key:       node.Key,
 				Operation: op,
 				Path:      node.Path,
-				Value:     node.Value,
+				Value:     node.GetValue(),
 			}
 
 			ops = append(ops, info)
 
-			node.pristine = false
+			node.SetPristine(false)
 		}
 	}
 
@@ -179,14 +143,14 @@ func (t tree) Set(data map[string]interface{}) ([]EventData, error) {
 func (t tree) setTreePathData(path []string, data interface{}) (EventData, error) {
 	node := t.findNode(path, true)
 	var op EventOperation
-	if node.pristine {
+	if node.GetPristine() {
 		op = EventOperationInsert
 	} else {
 		op = EventOperationUpdate
 	}
 
-	node.Value = data
-	node.pristine = false
+	node.SetValue(data)
+	node.SetPristine(false)
 
 	return EventData{
 		Key:       node.Key,
@@ -203,9 +167,10 @@ func (t tree) SetPath(path []string, data interface{}) ([]EventData, error) {
 	case map[string]interface{}:
 		node := t.findNode(path, true)
 		diff := []string{}
-		for k := range node.Children {
-			if d[k] == nil {
-				diff = append(diff, k)
+
+		for item := range node.Children.IterBuffered() {
+			if d[item.Key] == nil {
+				diff = append(diff, item.Key)
 			}
 		}
 
@@ -235,12 +200,13 @@ func (t tree) SetPath(path []string, data interface{}) ([]EventData, error) {
 }
 
 func (t tree) iterateDescendants(node *Node, f func(node *Node), includeSelf bool) {
+	//TODO: can we lock on a less general places without introducing data races?
 	if includeSelf {
 		f(node)
 	}
 
-	for _, n := range node.Children {
-		t.iterateDescendants(n, f, true)
+	for item := range node.Children.IterBuffered() {
+		t.iterateDescendants(item.Val.(*Node), f, true)
 	}
 }
 
@@ -257,15 +223,16 @@ func (t tree) Delete(path []string) ([]EventData, bool) {
 			Key:       node.Key,
 			Operation: EventOperationDelete,
 			Path:      node.Path,
-			Value:     node.Value,
+			Value:     node.value,
 		})
 
-		if node.Parent != nil { //probably root
-			delete(node.Parent.Children, node.Key)
+		parent := node.GetParent()
+		if parent != nil { //probably root
+			parent.Children.Remove(node.Key)
 		}
 
-		node.Value = nil
-		node.Parent = nil
+		node.SetValue(nil)
+		node.SetParent(nil)
 	}, true)
 
 	return eventData, true
@@ -278,12 +245,13 @@ func (t tree) getJSON(node *Node, level int) interface{} {
 		return nil
 	}
 
-	if len(node.Children) == 0 {
-		if node.Value == nil {
+	if node.Children.Count() == 0 {
+		val := node.GetValue()
+		if val == nil {
 			return res
 		}
 
-		return node.Value
+		return val
 	}
 
 	setJSONValue := func(json map[string]interface{}, path []string, value interface{}) {
@@ -304,8 +272,8 @@ func (t tree) getJSON(node *Node, level int) interface{} {
 
 	t.iterateDescendants(node, func(childNode *Node) {
 		//we need to iterate only the leafs
-		if len(childNode.Children) == 0 {
-			setJSONValue(res, childNode.Path[level:], childNode.Value)
+		if childNode.Children.Count() == 0 {
+			setJSONValue(res, childNode.Path[level:], childNode.GetValue())
 		}
 	}, false)
 

@@ -10,3 +10,5 @@ import:
   version: ^0.2.0
 - package: github.com/sirupsen/logrus
   version: ^1.0.2
+- package: github.com/sasha-s/go-deadlock
+  version: ^0.1.0

@@ -1,10 +1,12 @@
-hash: a4e21a0f5db21b37ef71e15e19ce252a64154cecc2b3e5767e4744e1e89ed88e
-updated: 2017-08-02T17:45:23.679007123+03:00
+hash: bb923810b19288674d9e9360070e3ec07e118ffd7c26d8e3f04be6b3226918c5
+updated: 2017-08-03T17:02:46.694358522+03:00
 imports:
 - name: github.com/gorilla/websocket
   version: ea4d1f681babbce9545c9c5f3d5194a789c89f5b
 - name: github.com/rs/cors
   version: 7af7a1e09ba336d2ea14b1ce73bf693c6837dbf6
+- name: github.com/sasha-s/go-deadlock
+  version: 09aefc0ac06ad74d91ca31acdb11fc981c159149
 - name: github.com/sirupsen/logrus
   version: a3f95b5c423586578a4e099b11a46c2479628cac
 - name: github.com/thoas/go-funk

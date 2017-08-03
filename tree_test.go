@@ -3,23 +3,25 @@ package liquiddb
 import (
 	"reflect"
 	"testing"
+
+	"github.com/orcaman/concurrent-map"
 )
 
 func TestNewNode(t *testing.T) {
 	n := newNode(TreeRoot, &Node{
 		Key:      "ParentTest",
-		Children: map[string]*Node{},
-		Parent:   nil,
+		Children: cmap.New(),
+		parent:   nil,
 		pristine: false,
-		Value:    nil,
+		value:    nil,
 	})
 
 	if n.Key != TreeRoot {
 		t.Fatalf("Invalid node key %s", n.Key)
 	}
 
-	if n.Parent == nil || n.Parent.Key != "ParentTest" {
-		t.Fatalf("Invalid parent %+v", n.Parent)
+	if n.parent == nil || n.parent.Key != "ParentTest" {
+		t.Fatalf("Invalid parent %+v", n.parent)
 	}
 }
 
@@ -91,7 +93,8 @@ func TestTree_DeleteAll(t *testing.T) {
 
 	tree.Set(data)
 
-	node := tree.root.Children["foo"]
+	n, _ := tree.root.Children.Get("foo")
+	node := n.(*Node)
 
 	tree.Delete([]string{})
 
@@ -100,7 +103,7 @@ func TestTree_DeleteAll(t *testing.T) {
 		t.Fatal("Invalid amount of children")
 	}
 
-	if node.Parent != nil || node.Value != nil {
+	if node.parent != nil || node.GetValue() != nil {
 		t.Fatal("Node is not deleted properly")
 	}
 }
