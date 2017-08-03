@@ -14,6 +14,7 @@ import MenuIcon from 'material-ui-icons/Menu';
 import StorageIcon from 'material-ui-icons/Storage';
 import InsertChartIcon from 'material-ui-icons/InsertChart';
 import Spinner from 'react-spinkit';
+import { debounce } from 'lodash';
 
 import Dashboard from './containers/dashboard/dashboard.container';
 import Database from './containers/database/database.container';
@@ -134,13 +135,13 @@ const mapDispatchToProps = dispatch =>
             initializeDb: () => async dispatch => {
                 const db = await new LiquidDb();
 
-                const refresh = async () => {
+                const refresh = debounce(async () => {
                     const data = await db.value();
                     dispatch({
                         type: 'DB_DATA',
                         data
                     });
-                };
+                }, 50);
 
                 db.data(refresh);
 

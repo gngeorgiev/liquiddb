@@ -4,6 +4,7 @@
     "private": true,
     "dependencies": {
         "liquiddb-javascript-driver": "file:../driver/javascript",
+        "lodash": "^4.17.4",
         "material-ui": "^1.0.0-beta.2",
         "material-ui-icons": "^1.0.0-alpha.19",
         "moment": "^2.18.1",
