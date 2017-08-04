@@ -1,13 +1,14 @@
 package main
 
-import deadlock "github.com/sasha-s/go-deadlock"
+import (
+	deadlock "github.com/sasha-s/go-deadlock"
+)
 
 //TODO: abstract this to work with an interface
 //TODO: the connection pool will probably later be responsible for distributing work
 type ConnectionPool struct {
 	connectionsLock    deadlock.RWMutex
 	connections        []*clientConnection
-	connectionsCount   int
 	connectionsUpdated chan int
 }
 
@@ -21,20 +22,13 @@ func NewConnectionPool() *ConnectionPool {
 
 func (p *ConnectionPool) AddConnection(c *clientConnection) {
 	p.connectionsLock.Lock()
-	defer p.connectionsLock.Unlock()
-
 	p.connections = append(p.connections, c)
-	p.connectionsCount = len(p.connections)
-
-	select {
-	case p.connectionsUpdated <- p.connectionsCount:
-	default:
-	}
+	p.connectionsUpdated <- len(p.connections)
+	p.connectionsLock.Unlock()
 }
 
 func (p *ConnectionPool) RemoveConnection(c *clientConnection) {
 	p.connectionsLock.Lock()
-	defer p.connectionsLock.Unlock()
 
 	index := -1
 	for i, conn := range p.connections {
@@ -48,21 +42,23 @@ func (p *ConnectionPool) RemoveConnection(c *clientConnection) {
 		p.connections = append(p.connections[:index], p.connections[index+1:]...)
 	}
 
-	p.connectionsCount = len(p.connections)
-
-	p.connectionsUpdated <- p.connectionsCount
+	p.connectionsUpdated <- len(p.connections)
+	p.connectionsLock.Unlock()
 }
 
 func (p *ConnectionPool) Len() int {
 	p.connectionsLock.RLock()
 	defer p.connectionsLock.RUnlock()
 
-	return p.connectionsCount
+	return len(p.connections)
 }
 
 func (p *ConnectionPool) Connections() []*clientConnection {
 	p.connectionsLock.RLock()
 	defer p.connectionsLock.RUnlock()
 
-	return p.connections
+	connectionsBuffer := make([]*clientConnection, len(p.connections))
+	copy(connectionsBuffer, p.connections)
+
+	return connectionsBuffer
 }

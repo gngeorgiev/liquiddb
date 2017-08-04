@@ -7,24 +7,30 @@ export default class WidgetWrapper extends Component {
     static propTypes = {
         title: PropTypes.string.isRequired,
         routeName: PropTypes.string,
-        actionPressed: PropTypes.func
+        actionPressed: PropTypes.func,
+        style: PropTypes.any
     };
 
     render() {
+        const {
+            title,
+            children,
+            routeName,
+            actionPressed,
+            ...props
+        } = this.props;
+
         return (
-            <div>
+            <div {...props}>
                 <Card>
-                    <CardHeader title={this.props.title} />
+                    <CardHeader title={title} />
                     <CardContent>
-                        {this.props.children}
+                        {children}
                     </CardContent>
-                    {this.props.routeName
+                    {routeName
                         ? <CardActions>
-                              <Button
-                                  onClick={() => this.props.actionPressed()}
-                                  dense
-                              >
-                                  Go to {this.props.routeName} page
+                              <Button onClick={() => actionPressed()} dense>
+                                  Go to {routeName} page
                               </Button>
                           </CardActions>
                         : null}

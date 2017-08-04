@@ -108,6 +108,8 @@ type stats struct {
 }
 
 func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, r *http.Request) {
+	statsWorkerPool := NewWorkerPool(4, 1*time.Second)
+
 	newConnection := make(chan chan []string)
 	removeConnection := make(chan chan []string)
 	publishConnectionsInfo := make(chan []string)
@@ -134,6 +136,7 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 				for i, ch := range connectionsChannels {
 					if ch == oldC {
 						index = i
+						break
 					}
 				}
 
@@ -144,15 +147,28 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 				}
 			case info := <-publishConnectionsInfo:
 				for _, ch := range connectionsChannels {
-					ch <- info
+					//delegating the work to the pool will allow us to
+					//not be in a situation where a channel blocks
+					//this should not happen, but still, if it does
+					//the whole stats section of the application
+					//will deadlock. We are also distributing
+					//the work to more goroutines
+					func(ch chan []string) {
+						statsWorkerPool.Schedule(func() {
+							ch <- info
+						})
+					}(ch)
 				}
 			}
 		}
 	}()
 
 	go func() {
-		for _ = range clientConnectionsPool.connectionsUpdated {
-			updateConnections()
+		for {
+			select {
+			case <-clientConnectionsPool.connectionsUpdated:
+				updateConnections()
+			}
 		}
 	}()
 
@@ -163,11 +179,9 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 			return
 		}
 
-		defer ws.Close()
-
 		log.WithField("address", ws.RemoteAddr().String()).Info("New Stats Connection")
 
-		connectionsChannel := make(chan []string)
+		connectionsChannel := make(chan []string, 10)
 		newConnection <- connectionsChannel
 
 		defer func() {
