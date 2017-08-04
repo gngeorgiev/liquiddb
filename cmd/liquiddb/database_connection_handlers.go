@@ -41,19 +41,29 @@ func (a App) handleSocketStoreNotify(conn *clientConnection, terminate chan stru
 }
 
 func (a App) handleSocketClient(conn *clientConnection, terminate chan struct{}) error {
-	for {
-		select {
-		case <-terminate:
-			return nil
-		default:
+	dataCh := make(chan operationClientData, 10)
+	errorCh := make(chan error)
+
+	go func() {
+		for {
 			var data operationClientData
 			err := conn.ReadJSON(&data)
 			if err != nil {
 				//TODO: try to write one last error to the ws connection before closing it
 				log.WithField("category", "read").Error(err)
-				return err
+				errorCh <- err
+				return
 			}
 
+			dataCh <- data
+		}
+	}()
+
+	for {
+		select {
+		case <-terminate:
+			return nil
+		case data := <-dataCh:
 			if data.Operation != hearthbeatResponseOperation {
 				log.WithField("data", data).Debug("Received data")
 			}
@@ -86,9 +96,8 @@ func (a App) handleSocketClient(conn *clientConnection, terminate chan struct{})
 				}).Error("Invalid operation type")
 			}
 
-			// if data.Operation != hearthbeatResponseOperation {
-			// 	log.WithField("data", data).Debug("Processed data")
-			// }
+		case err := <-errorCh:
+			return err
 		}
 	}
 }

@@ -254,7 +254,6 @@ describe('DB reconnect', () => {
 
         db.set(dbVal).then(() => {
             db.data(d => {
-                console.log(d);
                 assert.equal(d.operation, 'update');
                 done();
             });
