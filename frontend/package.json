@@ -21,8 +21,9 @@
         "react-spinkit": "^3.0.0",
         "redux": "^3.7.2",
         "redux-thunk": "^2.2.0",
-        "terminal-in-react": "git+https://github.com/gngeorgiev/terminal-in-react.git#3.x.x",
-        "typeface-roboto": "0.0.31"
+        "terminal-in-react": "file:../../../../../../stuff/terminal-in-react",
+        "typeface-roboto": "0.0.31",
+        "xterm": "^2.9.0"
     },
     "scripts": {
         "start": "react-scripts start",

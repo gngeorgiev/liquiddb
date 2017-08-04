@@ -1,8 +1,8 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
-import Terminal from 'terminal-in-react';
-import 'terminal-in-react/lib/css/index.css';
+import Terminal from '../../components/terminal/terminal.component';
+// import 'terminal-in-react/lib/css/index.css';
 
 import DatabaseViewer from '../../components/database-viewer/database-viewer.component';
 import './database.container.css';
@@ -24,7 +24,7 @@ class Database extends Component {
                     color="#BDBDBD"
                     commandPassThrough={(cmd, print) => {
                         this.props.executeDatabaseCode(
-                            cmd.join(''),
+                            cmd.join(' '),
                             this.props.db,
                             print
                         );
