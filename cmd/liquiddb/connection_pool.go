@@ -5,7 +5,7 @@ import deadlock "github.com/sasha-s/go-deadlock"
 //TODO: abstract this to work with an interface
 //TODO: the connection pool will probably later be responsible for distributing work
 type ConnectionPool struct {
-	connectionsLock    deadlock.Mutex
+	connectionsLock    deadlock.RWMutex
 	connections        []*clientConnection
 	connectionsCount   int
 	connectionsUpdated chan int
@@ -13,9 +13,9 @@ type ConnectionPool struct {
 
 func NewConnectionPool() *ConnectionPool {
 	return &ConnectionPool{
-		connectionsLock:    deadlock.Mutex{},
+		connectionsLock:    deadlock.RWMutex{},
 		connections:        make([]*clientConnection, 0),
-		connectionsUpdated: make(chan int),
+		connectionsUpdated: make(chan int, 10),
 	}
 }
 
@@ -26,7 +26,10 @@ func (p *ConnectionPool) AddConnection(c *clientConnection) {
 	p.connections = append(p.connections, c)
 	p.connectionsCount = len(p.connections)
 
-	p.connectionsUpdated <- p.connectionsCount
+	select {
+	case p.connectionsUpdated <- p.connectionsCount:
+	default:
+	}
 }
 
 func (p *ConnectionPool) RemoveConnection(c *clientConnection) {
@@ -51,15 +54,15 @@ func (p *ConnectionPool) RemoveConnection(c *clientConnection) {
 }
 
 func (p *ConnectionPool) Len() int {
-	p.connectionsLock.Lock()
-	defer p.connectionsLock.Unlock()
+	p.connectionsLock.RLock()
+	defer p.connectionsLock.RUnlock()
 
 	return p.connectionsCount
 }
 
 func (p *ConnectionPool) Connections() []*clientConnection {
-	p.connectionsLock.Lock()
-	defer p.connectionsLock.Unlock()
+	p.connectionsLock.RLock()
+	defer p.connectionsLock.RUnlock()
 
 	return p.connections
 }

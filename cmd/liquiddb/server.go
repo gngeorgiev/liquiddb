@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"sync"
 
-	deadlock "github.com/sasha-s/go-deadlock"
 	log "github.com/sirupsen/logrus"
 
 	"time"
@@ -52,6 +51,8 @@ func (a App) dbHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, 
 
 		conn := newClientConnection(ws)
 		clientConnectionsPool.AddConnection(conn)
+
+		log.WithField("address", conn.String()).Info("New Connection")
 
 		defer func() {
 			err := conn.Close()
@@ -107,7 +108,10 @@ type stats struct {
 }
 
 func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, r *http.Request) {
-	var connectionsChannelsMutex deadlock.Mutex
+	newConnection := make(chan chan []string)
+	removeConnection := make(chan chan []string)
+	publishConnectionsInfo := make(chan []string)
+
 	connectionsChannels := make([]chan []string, 0)
 
 	updateConnections := func() {
@@ -117,18 +121,37 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 			connectionsInfo[i] = c.String()
 		}
 
-		connectionsChannelsMutex.Lock()
-
-		for _, ch := range connectionsChannels {
-			ch <- connectionsInfo
-		}
-
-		connectionsChannelsMutex.Unlock()
+		publishConnectionsInfo <- connectionsInfo
 	}
 
 	go func() {
 		for {
-			<-clientConnectionsPool.connectionsUpdated
+			select {
+			case newC := <-newConnection:
+				connectionsChannels = append(connectionsChannels, newC)
+			case oldC := <-removeConnection:
+				index := -1
+				for i, ch := range connectionsChannels {
+					if ch == oldC {
+						index = i
+					}
+				}
+
+				if index != -1 {
+					connectionsChannels = append(connectionsChannels[:index], connectionsChannels[index+1:]...)
+				} else {
+					log.Error("Stats count channel not found in collection")
+				}
+			case info := <-publishConnectionsInfo:
+				for _, ch := range connectionsChannels {
+					ch <- info
+				}
+			}
+		}
+	}()
+
+	go func() {
+		for _ = range clientConnectionsPool.connectionsUpdated {
 			updateConnections()
 		}
 	}()
@@ -142,26 +165,17 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 
 		defer ws.Close()
 
+		log.WithField("address", ws.RemoteAddr().String()).Info("New Stats Connection")
+
 		connectionsChannel := make(chan []string)
+		newConnection <- connectionsChannel
 
 		defer func() {
-			connectionsChannelsMutex.Lock()
-			defer connectionsChannelsMutex.Unlock()
-
-			index := -1
-			for i, ch := range connectionsChannels {
-				if ch == connectionsChannel {
-					index = i
-				}
+			removeConnection <- connectionsChannel
+			err := ws.Close()
+			if err != nil {
+				log.WithField("category", "close stats connection").Error(err)
 			}
-
-			if index != -1 {
-				connectionsChannels = append(connectionsChannels[:index], connectionsChannels[index+1:]...)
-			} else {
-				log.Error("Stats count channel not found in collection")
-			}
-
-			close(connectionsChannel)
 		}()
 
 		go updateConnections()

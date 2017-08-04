@@ -24,7 +24,7 @@ describe('Stats', () => {
                 }
             }, 100);
 
-            assert.ok(d.connectionsCount > 0);
+            assert.ok(d.connections.length > 0);
         });
 
         new LiquidDb().connect().then(d => {
@@ -44,7 +44,7 @@ describe('Stats', () => {
                 }
             }, 100);
 
-            assert.ok(d.connectionsCount > 0);
+            assert.ok(d.connections.length > 0);
         });
 
         stats

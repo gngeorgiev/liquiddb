@@ -37,8 +37,6 @@ func newClientConnection(ws *websocket.Conn) *clientConnection {
 		ws: ws,
 	}
 
-	log.WithField("address", c.String()).Info("New Connection")
-
 	return c
 }
 
