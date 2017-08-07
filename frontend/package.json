@@ -10,7 +10,7 @@
         "moment": "^2.18.1",
         "prop-types": "^15.5.10",
         "react": "^15.6.1",
-        "react-ace": "^5.1.1",
+        "react-ace": "^5.1.2",
         "react-dom": "^15.6.1",
         "react-grid-system": "^2.9.2",
         "react-json-tree": "^0.10.9",
@@ -22,8 +22,7 @@
         "redux": "^3.7.2",
         "redux-thunk": "^2.2.0",
         "terminal-in-react": "file:../../../../../../stuff/terminal-in-react",
-        "typeface-roboto": "0.0.31",
-        "xterm": "^2.9.0"
+        "typeface-roboto": "0.0.31"
     },
     "scripts": {
         "start": "react-scripts start",

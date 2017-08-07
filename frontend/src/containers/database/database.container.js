@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
-import Terminal from '../../components/terminal/terminal.component';
+import CodeEditor from '../../components/code-editor/code-editor.component';
 // import 'terminal-in-react/lib/css/index.css';
 
 import DatabaseViewer from '../../components/database-viewer/database-viewer.component';
@@ -13,23 +13,15 @@ class Database extends Component {
     render() {
         return (
             <div className="database-container">
-                <Terminal
-                    style={{
-                        maxHeight: 300,
-                        height: 300
-                    }}
-                    msg="Write commands using the provided db object, a reference to a LiquidDb instance."
-                    watchConsoleLogging={false}
-                    startState="maximised"
-                    color="#BDBDBD"
-                    commandPassThrough={(cmd, print) => {
+                <CodeEditor
+                    onExecute={code =>
                         this.props.executeDatabaseCode(
-                            cmd.join(' '),
+                            code,
                             this.props.db,
-                            print
-                        );
-                    }}
+                            console.log.bind(console)
+                        )}
                 />
+
                 <DatabaseViewer expand={true} data={this.props.data} />
             </div>
         );

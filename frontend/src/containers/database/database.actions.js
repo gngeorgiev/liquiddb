@@ -1,8 +1,6 @@
 export const executeDatabaseCode = (code, db, print) => {
     const codeWrapper = `(function code() {
-        return function (db) {
-            return $code
-        }; 
+        return $code
     }())`;
 
     return async dispatch => {
