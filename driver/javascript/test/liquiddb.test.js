@@ -281,9 +281,7 @@ describe('DB', () => {
         });
 
         it('disconnected', done => {
-            db.onDisconnected(() => {
-                done();
-            });
+            db.onDisconnected(() => done());
             db.close();
         });
     });
