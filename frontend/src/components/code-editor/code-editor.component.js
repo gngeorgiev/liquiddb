@@ -83,11 +83,13 @@ export default class CodeEditor extends Component {
 
             const diff = moment().diff(date, 'seconds');
             this.setState({
-                lastSaved: diff ? `${diff} seconds ago` : 'just now'
+                lastSaved: diff
+                    ? `${moment().preciseDiff(date)} ago`
+                    : 'just now'
             });
         };
 
-        this._lastSavedInterval = setInterval(this._updateLastSaved, 5000);
+        this._lastSavedInterval = setInterval(this._updateLastSaved, 1000);
         this._updateLastSaved();
     }
 

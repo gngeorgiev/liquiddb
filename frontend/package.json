@@ -8,6 +8,7 @@
         "material-ui": "^1.0.0-beta.2",
         "material-ui-icons": "^1.0.0-alpha.19",
         "moment": "^2.18.1",
+        "moment-precise-range-plugin": "^1.2.4",
         "prop-types": "^15.5.10",
         "react": "^15.6.1",
         "react-ace": "^5.1.2",

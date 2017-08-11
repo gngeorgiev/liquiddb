@@ -10,6 +10,8 @@ import registerServiceWorker from './registerServiceWorker';
 import store, { history } from './store';
 import './index.css';
 
+import 'moment-precise-range-plugin';
+
 ReactDOM.render(
     <Provider store={store}>
         <ConnectedRouter history={history}>
