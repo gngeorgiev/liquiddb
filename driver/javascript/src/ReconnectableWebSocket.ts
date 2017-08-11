@@ -102,6 +102,8 @@ export class ReconnectableWebSocket extends EventEmitter {
             this.socketOpen = false;
             this.emit('close', err);
             this.onSocketClose();
+
+            this.emit('disconnected');
         };
 
         this.ws.onerror = (...args) => {
@@ -116,6 +118,8 @@ export class ReconnectableWebSocket extends EventEmitter {
 
             this.socketOpen = true;
             this.onSocketOpen();
+
+            this.emit('connected');
         };
 
         this.ws.onmessage = this.onSocketMessage.bind(this);

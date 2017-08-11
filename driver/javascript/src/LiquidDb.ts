@@ -51,6 +51,16 @@ export class LiquidDb {
         return this.socket.ready;
     }
 
+    onConnected(callback: () => any): () => any {
+        this.socket.on('connected', callback);
+        return () => this.socket.removeListener('connected', callback);
+    }
+
+    onDisconnected(callback: () => any): () => any {
+        this.socket.on('disconnected', callback);
+        return () => this.socket.removeListener('disconnected', callback);
+    }
+
     reconnect() {
         return this.socket.reconnect();
     }
