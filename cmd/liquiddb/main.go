@@ -23,5 +23,5 @@ func main() {
 	log.SetOutput(os.Stdout)
 	log.SetLevel(log.InfoLevel)
 
-	log.Fatal(app.startServer())
+	log.Fatal(app.startWsServer())
 }

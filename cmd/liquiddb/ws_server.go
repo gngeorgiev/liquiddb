@@ -49,7 +49,7 @@ func (a App) dbHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, 
 			return
 		}
 
-		conn := newClientConnection(ws)
+		conn := newWsClientConnection(ws)
 		clientConnectionsPool.AddConnection(conn)
 
 		log.WithField("address", conn.String()).Info("New Connection")
@@ -62,7 +62,7 @@ func (a App) dbHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, 
 			}
 		}()
 
-		handlers := map[string]func(*clientConnection, chan struct{}) error{
+		handlers := map[string]func(ClientConnection, chan struct{}) error{
 			"handleSocketStoreNotify": a.handleSocketStoreNotify,
 			"handleSocketClient":      a.handleSocketClient,
 			"handleSocketHearthbeat":  a.handleSocketHearthbeat,
@@ -76,7 +76,7 @@ func (a App) dbHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, 
 		wg.Add(len(handlers))
 
 		for handlerName, handler := range handlers {
-			go func(handlerName string, handler func(*clientConnection, chan struct{}) error, terminateHandler chan struct{}) {
+			go func(handlerName string, handler func(ClientConnection, chan struct{}) error, terminateHandler chan struct{}) {
 				defer wg.Done()
 				err := handler(conn, terminateHandler)
 				log.WithFields(log.Fields{
@@ -148,7 +148,7 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 			case info := <-publishConnectionsInfo:
 				for _, ch := range connectionsChannels {
 					//delegating the work to the pool will allow us to
-					//not be in a situation where a channel blocks
+					//not be in a situation where a channel blocks.
 					//this should not happen, but still, if it does
 					//the whole stats section of the application
 					//will deadlock. We are also distributing
@@ -208,7 +208,7 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 
 const serverPort = ":8082"
 
-func (a App) startServer() error {
+func (a App) startWsServer() error {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Fatal(r)

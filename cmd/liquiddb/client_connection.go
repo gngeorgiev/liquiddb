@@ -3,57 +3,93 @@ package main
 import (
 	"time"
 
-	"github.com/gorilla/websocket"
-
 	"github.com/gngeorgiev/liquiddb"
 	deadlock "github.com/sasha-s/go-deadlock"
 	log "github.com/sirupsen/logrus"
 )
 
-type clientConnection struct {
-	deadlock.Mutex
+type ClientConnection interface {
+	WriteInterested(path string, o liquiddb.EventData) (bool, error)
+	AddInterest(interest string, op liquiddb.EventOperation, o operationClientData) error
+	RemoveInterest(interest string, op liquiddb.EventOperation, o operationClientData)
 
-	interests map[string][]*clientInterest
+	GetLatencyHistory() [3]int32
+	SetLatencyHistory([3]int32)
+	GetLatency() int32
+	SetLatency(int32)
 
-	latencyMutex       deadlock.Mutex
-	latencyHistory     [3]int32
-	latency            int32
-	hearthbeatResponse chan struct{}
+	HearthbeatResponse() chan struct{}
 
-	ws *websocket.Conn
+	WriteJSON(o interface{}) error
+	ReadJSON(o interface{}) error
+	Close() error
+	SetCloseHandler(func(code int, text string) error)
+
+	String() string
 }
 
-func newClientConnection(ws *websocket.Conn) *clientConnection {
-	c := &clientConnection{
-		Mutex: deadlock.Mutex{},
+type clientConnection struct {
+	interestsMutex deadlock.Mutex
+	interests      map[string][]*clientInterest
 
-		interests: map[string][]*clientInterest{},
+	latencyHistoryMutex deadlock.Mutex
+	latencyHistory      [3]int32
+
+	latencyMutex deadlock.Mutex
+	latency      int32
+
+	hearthbeatResponse chan struct{}
+}
+
+func newClientConnection() *clientConnection {
+	c := &clientConnection{
+		interestsMutex: deadlock.Mutex{},
+		interests:      map[string][]*clientInterest{},
+
+		latencyHistoryMutex: deadlock.Mutex{},
+		latencyHistory:      [3]int32{},
 
 		latencyMutex:       deadlock.Mutex{},
-		latencyHistory:     [3]int32{},
 		latency:            0,
 		hearthbeatResponse: make(chan struct{}),
-
-		ws: ws,
 	}
 
 	return c
 }
 
-func (c *clientConnection) String() string {
-	return c.ws.RemoteAddr().String()
+func (c *clientConnection) HearthbeatResponse() chan struct{} {
+	return c.hearthbeatResponse
 }
 
-func (c *clientConnection) Close() error {
-	c.Lock()
-	defer c.Unlock()
+func (c *clientConnection) GetLatencyHistory() [3]int32 {
+	c.latencyHistoryMutex.Lock()
+	defer c.latencyHistoryMutex.Unlock()
 
-	return c.ws.Close()
+	return c.latencyHistory
+}
+
+func (c *clientConnection) SetLatencyHistory(l [3]int32) {
+	c.latencyHistoryMutex.Lock()
+	c.latencyHistory = l
+	c.latencyHistoryMutex.Unlock()
+}
+
+func (c *clientConnection) GetLatency() int32 {
+	c.latencyMutex.Lock()
+	defer c.latencyMutex.Unlock()
+
+	return c.latency
+}
+
+func (c *clientConnection) SetLatency(l int32) {
+	c.latencyMutex.Lock()
+	c.latency = l
+	c.latencyMutex.Unlock()
 }
 
 func (c *clientConnection) WriteInterested(path string, o liquiddb.EventData) (bool, error) {
-	c.Lock()
-	defer c.Unlock()
+	c.interestsMutex.Lock()
+	defer c.interestsMutex.Unlock()
 
 	op := o.Operation
 
@@ -75,7 +111,7 @@ func (c *clientConnection) WriteInterested(path string, o liquiddb.EventData) (b
 
 		interestHasValidTimestamp := o.Timestamp.After(interest.timestamp) || o.Timestamp.Equal(interest.timestamp)
 		if interest.operation == op && interestHasValidTimestamp {
-			return true, c.ws.WriteJSON(o)
+			return true, nil
 		}
 	}
 
@@ -83,8 +119,8 @@ func (c *clientConnection) WriteInterested(path string, o liquiddb.EventData) (b
 }
 
 func (c *clientConnection) AddInterest(interest string, op liquiddb.EventOperation, o operationClientData) error {
-	c.Lock()
-	defer c.Unlock()
+	c.interestsMutex.Lock()
+	defer c.interestsMutex.Unlock()
 
 	timestamp := o.Timestamp
 
@@ -119,20 +155,9 @@ func (c *clientConnection) AddInterest(interest string, op liquiddb.EventOperati
 	return nil
 }
 
-func (c *clientConnection) WriteJSON(o interface{}) error {
-	c.Lock()
-	defer c.Unlock()
-
-	return c.ws.WriteJSON(o)
-}
-
-func (c *clientConnection) ReadJSON(o interface{}) error {
-	return c.ws.ReadJSON(o)
-}
-
 func (c *clientConnection) RemoveInterest(interest string, op liquiddb.EventOperation, o operationClientData) {
-	c.Lock()
-	defer c.Unlock()
+	c.interestsMutex.Lock()
+	defer c.interestsMutex.Unlock()
 
 	if interest == "" {
 		interest = liquiddb.TreeRoot

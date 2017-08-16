@@ -11,7 +11,7 @@ import (
 )
 
 //TODO: Use protocol buffers!
-func (a App) handleSocketStoreNotify(conn *clientConnection, terminate chan struct{}) error {
+func (a App) handleSocketStoreNotify(conn ClientConnection, terminate chan struct{}) error {
 	ch := make(chan liquiddb.EventData, 10)
 	a.db.Notify(ch, liquiddb.EventOperationDelete, liquiddb.EventOperationInsert,
 		liquiddb.EventOperationUpdate, liquiddb.EventOperationGet)
@@ -28,6 +28,7 @@ func (a App) handleSocketStoreNotify(conn *clientConnection, terminate chan stru
 			send, err := conn.WriteInterested(strings.Join(op.Path, "."), op)
 			if send {
 				log.WithField("data", op).Debug("Sending data")
+				err = conn.WriteJSON(op)
 			} else {
 				log.WithField("operation", op).Debug("Did not send data because not interested")
 			}
@@ -40,7 +41,7 @@ func (a App) handleSocketStoreNotify(conn *clientConnection, terminate chan stru
 	}
 }
 
-func (a App) handleSocketClient(conn *clientConnection, terminate chan struct{}) error {
+func (a App) handleSocketClient(conn ClientConnection, terminate chan struct{}) error {
 	dataCh := make(chan operationClientData, 10)
 	errorCh := make(chan error)
 
@@ -87,7 +88,7 @@ func (a App) handleSocketClient(conn *clientConnection, terminate chan struct{})
 				//TODO: can we optimize this strings join?
 				conn.RemoveInterest(strings.Join(data.Path, "."), op, data)
 			case hearthbeatResponseOperation:
-				conn.hearthbeatResponse <- struct{}{}
+				conn.HearthbeatResponse() <- struct{}{}
 			default:
 				//TODO: should we and how to notify the user about this
 				log.WithFields(log.Fields{
@@ -102,7 +103,7 @@ func (a App) handleSocketClient(conn *clientConnection, terminate chan struct{})
 	}
 }
 
-func (a App) handleSocketHearthbeat(conn *clientConnection, terminate chan struct{}) error {
+func (a App) handleSocketHearthbeat(conn ClientConnection, terminate chan struct{}) error {
 	//TODO: refactor this method a bit as it has become too large
 	//also refactor the whole file as it has also become too large
 	sendHearthbeat := func() error {
@@ -136,7 +137,7 @@ func (a App) handleSocketHearthbeat(conn *clientConnection, terminate chan struc
 			}
 
 			select {
-			case <-conn.hearthbeatResponse:
+			case <-conn.HearthbeatResponse():
 				now := time.Now()
 				difference := now.Sub(sendTime).Nanoseconds()
 				latencyResult := (difference / int64(time.Millisecond)) / 2
@@ -167,13 +168,13 @@ func (a App) handleSocketHearthbeat(conn *clientConnection, terminate chan struc
 			case <-terminate:
 				return nil
 			case latency := <-latencyResult:
-				conn.latencyMutex.Lock()
+				latencyHistory := conn.GetLatencyHistory()
 				//move the history of latencies to the left, leaving the last index to the new latency
-				conn.latencyHistory[0] = conn.latencyHistory[1]
-				conn.latencyHistory[1] = conn.latencyHistory[2]
-				conn.latencyHistory[2] = latency
-				conn.latency = (conn.latencyHistory[0] + conn.latencyHistory[1] + conn.latencyHistory[2]) / 3
-				conn.latencyMutex.Unlock()
+				latencyHistory[0] = latencyHistory[1]
+				latencyHistory[1] = latencyHistory[2]
+				latencyHistory[2] = latency
+				conn.SetLatencyHistory(latencyHistory)
+				conn.SetLatency((latencyHistory[0] + latencyHistory[1] + latencyHistory[2]) / 3)
 
 				timer.Stop()
 
@@ -196,12 +197,10 @@ func (a App) handleSocketHearthbeat(conn *clientConnection, terminate chan struc
 	}
 }
 
-func (a App) handleSocketClose(conn *clientConnection, terminate chan struct{}) error {
+func (a App) handleSocketClose(conn ClientConnection, terminate chan struct{}) error {
 	ch := make(chan error)
 
-	conn.Lock()
-
-	conn.ws.SetCloseHandler(func(code int, text string) error {
+	conn.SetCloseHandler(func(code int, text string) error {
 		go func() {
 			socketCloseErr := fmt.Errorf("Socket close %d %s", code, text)
 			log.WithField("category", "socket close").Error(socketCloseErr)
@@ -210,8 +209,6 @@ func (a App) handleSocketClose(conn *clientConnection, terminate chan struct{}) 
 
 		return nil
 	})
-
-	conn.Unlock()
 
 	select {
 	case <-terminate:
