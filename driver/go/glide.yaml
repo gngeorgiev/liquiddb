@@ -1,2 +1,4 @@
 package: github.com/gngeorgiev/liquiddb/driver/go
-import: []
+import:
+- package: github.com/sirupsen/logrus
+  version: ^1.0.3

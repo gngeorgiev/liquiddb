@@ -23,7 +23,6 @@ type ClientConnection interface {
 	WriteJSON(o interface{}) error
 	ReadJSON(o interface{}) error
 	Close() error
-	SetCloseHandler(func(code int, text string) error)
 
 	String() string
 }

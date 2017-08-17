@@ -2,10 +2,28 @@ package liquidgo
 
 type LiquidGoConfigBuilder struct {
 	autoConnect *bool
+	host        *string
+	port        *string
+}
+
+type LiquidGoConfig struct {
+	AutoConnect bool
+	Host        string
+	Port        string
 }
 
 func NewConfigBuilder() *LiquidGoConfigBuilder {
 	return &LiquidGoConfigBuilder{}
+}
+
+func (c *LiquidGoConfigBuilder) Host(host string) *LiquidGoConfigBuilder {
+	c.host = &host
+	return c
+}
+
+func (c *LiquidGoConfigBuilder) Port(port string) *LiquidGoConfigBuilder {
+	c.port = &port
+	return c
 }
 
 func (c *LiquidGoConfigBuilder) AutoConnect(val bool) *LiquidGoConfigBuilder {
@@ -22,9 +40,17 @@ func (c *LiquidGoConfigBuilder) Finalize() LiquidGoConfig {
 		config.AutoConnect = true
 	}
 
-	return config
-}
+	if c.host != nil {
+		config.Host = *c.host
+	} else {
+		config.Host = "localhost"
+	}
 
-type LiquidGoConfig struct {
-	AutoConnect bool
+	if c.port != nil {
+		config.Port = *c.port
+	} else {
+		config.Port = ":8083"
+	}
+
+	return config
 }

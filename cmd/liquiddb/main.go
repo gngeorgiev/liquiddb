@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 
@@ -23,5 +24,22 @@ func main() {
 	log.SetOutput(os.Stdout)
 	log.SetLevel(log.InfoLevel)
 
-	log.Fatal(app.startWsServer())
+	var serversWg sync.WaitGroup
+	//we should exit if any of the servers crashes
+	//at least for now
+	serversWg.Add(1)
+
+	go func() {
+		defer serversWg.Done()
+
+		log.Fatal(app.startWsServer(":8082"))
+	}()
+
+	go func() {
+		defer serversWg.Done()
+
+		log.Fatal(app.startTcpServer(":8083"))
+	}()
+
+	serversWg.Wait()
 }

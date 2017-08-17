@@ -2,8 +2,8 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gngeorgiev/liquiddb"
@@ -197,23 +197,54 @@ func (a App) handleSocketHearthbeat(conn ClientConnection, terminate chan struct
 	}
 }
 
-func (a App) handleSocketClose(conn ClientConnection, terminate chan struct{}) error {
-	ch := make(chan error)
+func (a App) dbConnectionHandler(conn ClientConnection) {
+	clientConnectionsPool.AddConnection(conn)
 
-	conn.SetCloseHandler(func(code int, text string) error {
-		go func() {
-			socketCloseErr := fmt.Errorf("Socket close %d %s", code, text)
-			log.WithField("category", "socket close").Error(socketCloseErr)
-			ch <- socketCloseErr
-		}()
+	log.WithField("address", conn.String()).Info("New Connection")
 
-		return nil
-	})
+	defer func() {
+		err := conn.Close()
+		clientConnectionsPool.RemoveConnection(conn)
+		if err != nil {
+			log.WithField("category", "close ws connection").Error(err)
+		}
+	}()
 
-	select {
-	case <-terminate:
-		return nil
-	case err := <-ch:
-		return err
+	handlers := map[string]func(ClientConnection, chan struct{}) error{
+		"handleSocketStoreNotify": a.handleSocketStoreNotify,
+		"handleSocketClient":      a.handleSocketClient,
+		"handleSocketHearthbeat":  a.handleSocketHearthbeat,
 	}
+
+	terminateHandler := make(chan struct{}, len(handlers))
+	closeConnection := make(chan struct{}, len(handlers))
+
+	var wg sync.WaitGroup
+	wg.Add(len(handlers))
+
+	for handlerName, handler := range handlers {
+		go func(handlerName string, handler func(ClientConnection, chan struct{}) error, terminateHandler chan struct{}) {
+			defer wg.Done()
+			err := handler(conn, terminateHandler)
+			log.WithFields(log.Fields{
+				"category":    "handler returned",
+				"handlerName": handlerName,
+				"connection":  conn.String(),
+			}).Info(err)
+
+			closeConnection <- struct{}{}
+		}(handlerName, handler, terminateHandler)
+	}
+
+	go func() {
+		<-closeConnection
+		//terminate all handlers
+		for i := 0; i < len(handlers); i++ {
+			terminateHandler <- struct{}{}
+		}
+	}()
+
+	wg.Wait()
+	close(closeConnection)
+	log.WithField("connection", conn.String()).Info("Closed connection")
 }

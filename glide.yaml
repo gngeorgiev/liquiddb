@@ -8,3 +8,5 @@ import:
 - package: github.com/thoas/go-funk
   version: ^0.2.0
 - package: github.com/orcaman/concurrent-map
+- package: github.com/sirupsen/logrus
+  version: ^1.0.3

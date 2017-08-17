@@ -2,7 +2,6 @@ package main
 
 import (
 	"net/http"
-	"sync"
 
 	log "github.com/sirupsen/logrus"
 
@@ -50,56 +49,7 @@ func (a App) dbHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, 
 		}
 
 		conn := newWsClientConnection(ws)
-		clientConnectionsPool.AddConnection(conn)
-
-		log.WithField("address", conn.String()).Info("New Connection")
-
-		defer func() {
-			err := conn.Close()
-			clientConnectionsPool.RemoveConnection(conn)
-			if err != nil {
-				log.WithField("category", "close ws connection").Error(err)
-			}
-		}()
-
-		handlers := map[string]func(ClientConnection, chan struct{}) error{
-			"handleSocketStoreNotify": a.handleSocketStoreNotify,
-			"handleSocketClient":      a.handleSocketClient,
-			"handleSocketHearthbeat":  a.handleSocketHearthbeat,
-			"handleSocketClose":       a.handleSocketClose,
-		}
-
-		terminateHandler := make(chan struct{}, len(handlers))
-		closeConnection := make(chan struct{}, len(handlers))
-
-		var wg sync.WaitGroup
-		wg.Add(len(handlers))
-
-		for handlerName, handler := range handlers {
-			go func(handlerName string, handler func(ClientConnection, chan struct{}) error, terminateHandler chan struct{}) {
-				defer wg.Done()
-				err := handler(conn, terminateHandler)
-				log.WithFields(log.Fields{
-					"category":    "handler returned",
-					"handlerName": handlerName,
-					"connection":  conn.String(),
-				}).Info(err)
-
-				closeConnection <- struct{}{}
-			}(handlerName, handler, terminateHandler)
-		}
-
-		go func() {
-			<-closeConnection
-			//terminate all handlers
-			for i := 0; i < len(handlers); i++ {
-				terminateHandler <- struct{}{}
-			}
-		}()
-
-		wg.Wait()
-		close(closeConnection)
-		log.WithField("connection", conn.String()).Info("Closed connection")
+		a.dbConnectionHandler(conn)
 	}
 }
 
@@ -206,9 +156,7 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 	}
 }
 
-const serverPort = ":8082"
-
-func (a App) startWsServer() error {
+func (a App) startWsServer(serverPort string) error {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Fatal(r)
@@ -227,6 +175,6 @@ func (a App) startWsServer() error {
 
 	handler := cors.AllowAll().Handler(mux)
 
-	log.WithField("port", serverPort).Info("Server Listening")
+	log.WithField("port", serverPort).Info("WS server Listening")
 	return http.ListenAndServe(serverPort, handler)
 }

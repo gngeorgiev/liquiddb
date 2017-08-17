@@ -43,9 +43,3 @@ func (c *wsClientConnection) WriteJSON(o interface{}) error {
 func (c *wsClientConnection) ReadJSON(o interface{}) error {
 	return c.ws.ReadJSON(o)
 }
-
-func (c *wsClientConnection) SetCloseHandler(handler func(code int, text string) error) {
-	c.wsMutex.Lock()
-	c.ws.SetCloseHandler(handler)
-	c.wsMutex.Unlock()
-}
