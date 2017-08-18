@@ -1,44 +1,21 @@
-package main
+package server
 
 import (
 	"net/http"
 
+	"github.com/gngeorgiev/liquiddb/cmd/liquiddb/client_connection"
+	"github.com/gngeorgiev/liquiddb/cmd/liquiddb/pool"
 	log "github.com/sirupsen/logrus"
 
 	"time"
 
-	"github.com/gngeorgiev/liquiddb"
 	"github.com/gorilla/websocket"
 	"github.com/rs/cors"
 )
 
-type clientOperation string
-
-const (
-	clientOperationSet          = clientOperation("set")
-	clientOperationDelete       = clientOperation("delete")
-	clientOperationGet          = clientOperation("get")
-	clientOperationSubscribe    = clientOperation("subscribe")
-	clientOperationUnSubscribe  = clientOperation("unsubscribe")
-	hearthbeatOperation         = "hearthbeat"
-	hearthbeatResponseOperation = "hearthbeatResponse"
-)
-
-type operationClientData struct {
-	ID        uint64          `json:"id,omitempty"`
-	Operation clientOperation `json:"operation,omitempty"`
-	Path      []string        `json:"path,omitempty"`
-	Value     interface{}     `json:"value,omitempty"`
-	Timestamp string          `json:"timestamp,omitempty"`
+type stats struct {
+	Connections []string `json:"connections,omitempty"`
 }
-
-type clientInterest struct {
-	id        uint64
-	operation liquiddb.EventOperation
-	timestamp time.Time
-}
-
-var clientConnectionsPool = NewConnectionPool()
 
 func (a App) dbHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -48,17 +25,13 @@ func (a App) dbHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, 
 			return
 		}
 
-		conn := newWsClientConnection(ws)
+		conn := client_connection.NewWsClientConnection(ws)
 		a.dbConnectionHandler(conn)
 	}
 }
 
-type stats struct {
-	Connections []string `json:"connections,omitempty"`
-}
-
 func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWriter, r *http.Request) {
-	statsWorkerPool := NewWorkerPool(4, 1*time.Second)
+	statsWorkerPool := pool.NewWorkerPool(4, 1*time.Second)
 
 	newConnection := make(chan chan []string)
 	removeConnection := make(chan chan []string)
@@ -116,7 +89,7 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 	go func() {
 		for {
 			select {
-			case <-clientConnectionsPool.connectionsUpdated:
+			case <-clientConnectionsPool.ConnectionsUpdated():
 				updateConnections()
 			}
 		}
@@ -156,7 +129,7 @@ func (a App) statsHandler(upgrader websocket.Upgrader) func(w http.ResponseWrite
 	}
 }
 
-func (a App) startWsServer(serverPort string) error {
+func (a App) StartWsServer(serverPort string) error {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Fatal(r)

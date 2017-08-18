@@ -1,4 +1,4 @@
-package main
+package client_connection
 
 import (
 	"encoding/json"
@@ -13,7 +13,7 @@ type tcpClientConnection struct {
 	conn net.Conn
 }
 
-func newTcpClientConnection(conn net.Conn) ClientConnection {
+func NewTcpClientConnection(conn net.Conn) ClientConnection {
 	cc := newClientConnection()
 
 	return &tcpClientConnection{

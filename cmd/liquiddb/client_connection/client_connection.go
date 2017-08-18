@@ -1,17 +1,18 @@
-package main
+package client_connection
 
 import (
 	"time"
 
 	"github.com/gngeorgiev/liquiddb"
+	"github.com/gngeorgiev/liquiddb/cmd/liquiddb/operations"
 	deadlock "github.com/sasha-s/go-deadlock"
 	log "github.com/sirupsen/logrus"
 )
 
 type ClientConnection interface {
 	WriteInterested(path string, o liquiddb.EventData) (bool, error)
-	AddInterest(interest string, op liquiddb.EventOperation, o operationClientData) error
-	RemoveInterest(interest string, op liquiddb.EventOperation, o operationClientData)
+	AddInterest(interest string, op liquiddb.EventOperation, o operations.OperationClientData) error
+	RemoveInterest(interest string, op liquiddb.EventOperation, o operations.OperationClientData)
 
 	GetLatencyHistory() [3]int32
 	SetLatencyHistory([3]int32)
@@ -29,7 +30,7 @@ type ClientConnection interface {
 
 type clientConnection struct {
 	interestsMutex deadlock.Mutex
-	interests      map[string][]*clientInterest
+	interests      map[string][]*operations.ClientInterest
 
 	latencyHistoryMutex deadlock.Mutex
 	latencyHistory      [3]int32
@@ -43,7 +44,7 @@ type clientConnection struct {
 func newClientConnection() *clientConnection {
 	c := &clientConnection{
 		interestsMutex: deadlock.Mutex{},
-		interests:      map[string][]*clientInterest{},
+		interests:      map[string][]*operations.ClientInterest{},
 
 		latencyHistoryMutex: deadlock.Mutex{},
 		latencyHistory:      [3]int32{},
@@ -103,13 +104,13 @@ func (c *clientConnection) WriteInterested(path string, o liquiddb.EventData) (b
 
 	for _, interest := range interests {
 		log.WithFields(log.Fields{
-			"id":        interest.id,
-			"operation": interest.operation,
-			"timestamp": interest.timestamp,
+			"id":        interest.Id,
+			"operation": interest.Operation,
+			"timestamp": interest.Timestamp,
 		}).Debug("Interest")
 
-		interestHasValidTimestamp := o.Timestamp.After(interest.timestamp) || o.Timestamp.Equal(interest.timestamp)
-		if interest.operation == op && interestHasValidTimestamp {
+		interestHasValidTimestamp := o.Timestamp.After(interest.Timestamp) || o.Timestamp.Equal(interest.Timestamp)
+		if interest.Operation == op && interestHasValidTimestamp {
 			return true, nil
 		}
 	}
@@ -117,7 +118,7 @@ func (c *clientConnection) WriteInterested(path string, o liquiddb.EventData) (b
 	return false, nil
 }
 
-func (c *clientConnection) AddInterest(interest string, op liquiddb.EventOperation, o operationClientData) error {
+func (c *clientConnection) AddInterest(interest string, op liquiddb.EventOperation, o operations.OperationClientData) error {
 	c.interestsMutex.Lock()
 	defer c.interestsMutex.Unlock()
 
@@ -140,13 +141,13 @@ func (c *clientConnection) AddInterest(interest string, op liquiddb.EventOperati
 	t = t.Add(time.Duration(-c.latency) * time.Millisecond)
 	c.latencyMutex.Unlock()
 
-	cInterest := &clientInterest{
+	cInterest := &operations.ClientInterest{
 		o.ID,
 		op,
 		t,
 	}
 	if interests == nil {
-		c.interests[interest] = []*clientInterest{cInterest}
+		c.interests[interest] = []*operations.ClientInterest{cInterest}
 	} else {
 		c.interests[interest] = append(interests, cInterest)
 	}
@@ -154,7 +155,7 @@ func (c *clientConnection) AddInterest(interest string, op liquiddb.EventOperati
 	return nil
 }
 
-func (c *clientConnection) RemoveInterest(interest string, op liquiddb.EventOperation, o operationClientData) {
+func (c *clientConnection) RemoveInterest(interest string, op liquiddb.EventOperation, o operations.OperationClientData) {
 	c.interestsMutex.Lock()
 	defer c.interestsMutex.Unlock()
 
@@ -172,7 +173,7 @@ func (c *clientConnection) RemoveInterest(interest string, op liquiddb.EventOper
 	}
 
 	for i, cInterest := range interests {
-		if cInterest.operation == op && cInterest.id == o.ID {
+		if cInterest.Operation == op && cInterest.Id == o.ID {
 			c.interests[interest] = append(interests[:i], interests[i+1:]...)
 		}
 	}

@@ -1,6 +1,7 @@
-package main
+package pool
 
 import (
+	"github.com/gngeorgiev/liquiddb/cmd/liquiddb/client_connection"
 	deadlock "github.com/sasha-s/go-deadlock"
 )
 
@@ -8,26 +9,30 @@ import (
 //TODO: the connection pool will probably later be responsible for distributing work
 type ConnectionPool struct {
 	connectionsLock    deadlock.RWMutex
-	connections        []ClientConnection
+	connections        []client_connection.ClientConnection
 	connectionsUpdated chan int
 }
 
 func NewConnectionPool() *ConnectionPool {
 	return &ConnectionPool{
 		connectionsLock:    deadlock.RWMutex{},
-		connections:        make([]ClientConnection, 0),
+		connections:        make([]client_connection.ClientConnection, 0),
 		connectionsUpdated: make(chan int, 10),
 	}
 }
 
-func (p *ConnectionPool) AddConnection(c ClientConnection) {
+func (p *ConnectionPool) ConnectionsUpdated() <-chan int {
+	return p.connectionsUpdated
+}
+
+func (p *ConnectionPool) AddConnection(c client_connection.ClientConnection) {
 	p.connectionsLock.Lock()
 	p.connections = append(p.connections, c)
 	p.connectionsUpdated <- len(p.connections)
 	p.connectionsLock.Unlock()
 }
 
-func (p *ConnectionPool) RemoveConnection(c ClientConnection) {
+func (p *ConnectionPool) RemoveConnection(c client_connection.ClientConnection) {
 	p.connectionsLock.Lock()
 
 	index := -1
@@ -53,11 +58,11 @@ func (p *ConnectionPool) Len() int {
 	return len(p.connections)
 }
 
-func (p *ConnectionPool) Connections() []ClientConnection {
+func (p *ConnectionPool) Connections() []client_connection.ClientConnection {
 	p.connectionsLock.RLock()
 	defer p.connectionsLock.RUnlock()
 
-	connectionsBuffer := make([]ClientConnection, len(p.connections))
+	connectionsBuffer := make([]client_connection.ClientConnection, len(p.connections))
 	copy(connectionsBuffer, p.connections)
 
 	return connectionsBuffer

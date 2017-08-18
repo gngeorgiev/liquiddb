@@ -7,18 +7,12 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/gngeorgiev/liquiddb"
+	"github.com/gngeorgiev/liquiddb/cmd/liquiddb/server"
 )
-
-//App is the app that will be ran when the CLI is started
-type App struct {
-	db *liquiddb.LiquidDb
-}
 
 //tests for this package will be written when the Go driver is created
 func main() {
-	app := App{
-		db: liquiddb.New(),
-	}
+	app := server.NewApp(liquiddb.New())
 
 	log.SetFormatter(&log.TextFormatter{})
 	log.SetOutput(os.Stdout)
@@ -32,13 +26,13 @@ func main() {
 	go func() {
 		defer serversWg.Done()
 
-		log.Fatal(app.startWsServer(":8082"))
+		log.Fatal(app.StartWsServer(":8082"))
 	}()
 
 	go func() {
 		defer serversWg.Done()
 
-		log.Fatal(app.startTcpServer(":8083"))
+		log.Fatal(app.StartTcpServer(":8083"))
 	}()
 
 	serversWg.Wait()

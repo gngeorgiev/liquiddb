@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"errors"
@@ -7,11 +7,13 @@ import (
 	"time"
 
 	"github.com/gngeorgiev/liquiddb"
+	"github.com/gngeorgiev/liquiddb/cmd/liquiddb/client_connection"
+	"github.com/gngeorgiev/liquiddb/cmd/liquiddb/operations"
 	log "github.com/sirupsen/logrus"
 )
 
 //TODO: Use protocol buffers!
-func (a App) handleSocketStoreNotify(conn ClientConnection, terminate chan struct{}) error {
+func (a App) handleSocketStoreNotify(conn client_connection.ClientConnection, terminate chan struct{}) error {
 	ch := make(chan liquiddb.EventData, 10)
 	a.db.Notify(ch, liquiddb.EventOperationDelete, liquiddb.EventOperationInsert,
 		liquiddb.EventOperationUpdate, liquiddb.EventOperationGet)
@@ -41,13 +43,13 @@ func (a App) handleSocketStoreNotify(conn ClientConnection, terminate chan struc
 	}
 }
 
-func (a App) handleSocketClient(conn ClientConnection, terminate chan struct{}) error {
-	dataCh := make(chan operationClientData, 10)
+func (a App) handleSocketClient(conn client_connection.ClientConnection, terminate chan struct{}) error {
+	dataCh := make(chan operations.OperationClientData, 10)
 	errorCh := make(chan error)
 
 	go func() {
 		for {
-			var data operationClientData
+			var data operations.OperationClientData
 			err := conn.ReadJSON(&data)
 			if err != nil {
 				//TODO: try to write one last error to the ws connection before closing it
@@ -65,29 +67,29 @@ func (a App) handleSocketClient(conn ClientConnection, terminate chan struct{}) 
 		case <-terminate:
 			return nil
 		case data := <-dataCh:
-			if data.Operation != hearthbeatResponseOperation {
+			if data.Operation != operations.HearthbeatResponseOperation {
 				log.WithField("data", data).Debug("Received data")
 			}
 
 			switch data.Operation {
-			case clientOperationSet:
+			case operations.ClientOperationSet:
 				a.db.Link(data.ID).SetPath(data.Path, data.Value)
-			case clientOperationDelete:
+			case operations.ClientOperationDelete:
 				a.db.Link(data.ID).Delete(data.Path)
-			case clientOperationGet:
+			case operations.ClientOperationGet:
 				a.db.Link(data.ID).Get(data.Path)
-			case clientOperationSubscribe:
+			case operations.ClientOperationSubscribe:
 				op := liquiddb.EventOperation(data.Value.(string))
 				//TODO: can we optimize this strings join?
 				if err := conn.AddInterest(strings.Join(data.Path, "."), op, data); err != nil {
 					log.WithField("category", "add interest").Error(err)
 					return err
 				}
-			case clientOperationUnSubscribe:
+			case operations.ClientOperationUnSubscribe:
 				op := liquiddb.EventOperation(data.Value.(string))
 				//TODO: can we optimize this strings join?
 				conn.RemoveInterest(strings.Join(data.Path, "."), op, data)
-			case hearthbeatResponseOperation:
+			case operations.HearthbeatResponseOperation:
 				conn.HearthbeatResponse() <- struct{}{}
 			default:
 				//TODO: should we and how to notify the user about this
@@ -103,7 +105,7 @@ func (a App) handleSocketClient(conn ClientConnection, terminate chan struct{}) 
 	}
 }
 
-func (a App) handleSocketHearthbeat(conn ClientConnection, terminate chan struct{}) error {
+func (a App) handleSocketHearthbeat(conn client_connection.ClientConnection, terminate chan struct{}) error {
 	//TODO: refactor this method a bit as it has become too large
 	//also refactor the whole file as it has also become too large
 	sendHearthbeat := func() error {
@@ -111,7 +113,7 @@ func (a App) handleSocketHearthbeat(conn ClientConnection, terminate chan struct
 			Operation string `json:"operation,omitempty"`
 			Timestamp string `json:"timestamp,omitempty"`
 		}{
-			Operation: hearthbeatOperation,
+			Operation: operations.HearthbeatOperation,
 			Timestamp: time.Now().UTC().Format(time.RFC3339),
 		})
 		if err != nil {
@@ -197,7 +199,7 @@ func (a App) handleSocketHearthbeat(conn ClientConnection, terminate chan struct
 	}
 }
 
-func (a App) dbConnectionHandler(conn ClientConnection) {
+func (a App) dbConnectionHandler(conn client_connection.ClientConnection) {
 	clientConnectionsPool.AddConnection(conn)
 
 	log.WithField("address", conn.String()).Info("New Connection")
@@ -210,7 +212,7 @@ func (a App) dbConnectionHandler(conn ClientConnection) {
 		}
 	}()
 
-	handlers := map[string]func(ClientConnection, chan struct{}) error{
+	handlers := map[string]func(client_connection.ClientConnection, chan struct{}) error{
 		"handleSocketStoreNotify": a.handleSocketStoreNotify,
 		"handleSocketClient":      a.handleSocketClient,
 		"handleSocketHearthbeat":  a.handleSocketHearthbeat,
@@ -223,7 +225,7 @@ func (a App) dbConnectionHandler(conn ClientConnection) {
 	wg.Add(len(handlers))
 
 	for handlerName, handler := range handlers {
-		go func(handlerName string, handler func(ClientConnection, chan struct{}) error, terminateHandler chan struct{}) {
+		go func(handlerName string, handler func(client_connection.ClientConnection, chan struct{}) error, terminateHandler chan struct{}) {
 			defer wg.Done()
 			err := handler(conn, terminateHandler)
 			log.WithFields(log.Fields{

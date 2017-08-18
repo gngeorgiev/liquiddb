@@ -1,4 +1,4 @@
-package main
+package client_connection
 
 import (
 	"github.com/gorilla/websocket"
@@ -12,7 +12,7 @@ type wsClientConnection struct {
 	ws      *websocket.Conn
 }
 
-func newWsClientConnection(ws *websocket.Conn) ClientConnection {
+func NewWsClientConnection(ws *websocket.Conn) ClientConnection {
 	cc := newClientConnection()
 
 	return &wsClientConnection{

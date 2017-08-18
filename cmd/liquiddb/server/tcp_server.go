@@ -1,13 +1,14 @@
-package main
+package server
 
 import (
 	"net"
 	"sync"
 
+	"github.com/gngeorgiev/liquiddb/cmd/liquiddb/client_connection"
 	log "github.com/sirupsen/logrus"
 )
 
-func (a App) startTcpServer(serverPort string) error {
+func (a App) StartTcpServer(serverPort string) error {
 	server, err := net.Listen("tcp", serverPort)
 	if err != nil {
 		return err
@@ -26,7 +27,7 @@ func (a App) startTcpServer(serverPort string) error {
 		go func() {
 			defer connectionsWg.Done()
 
-			conn := newTcpClientConnection(c)
+			conn := client_connection.NewTcpClientConnection(c)
 			a.dbConnectionHandler(conn)
 		}()
 	}
