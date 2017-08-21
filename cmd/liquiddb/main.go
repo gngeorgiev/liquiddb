@@ -26,14 +26,15 @@ func main() {
 	go func() {
 		defer serversWg.Done()
 
-		log.Fatal(app.StartWsServer(":8082"))
+		log.Error(app.StartWsServer(":8082"))
 	}()
 
 	go func() {
 		defer serversWg.Done()
 
-		log.Fatal(app.StartTcpServer(":8083"))
+		log.Error(app.StartTcpServer(":8083"))
 	}()
 
+	//TODO: proper server shutdown
 	serversWg.Wait()
 }

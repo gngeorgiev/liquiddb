@@ -1,6 +1,8 @@
 package liquiddb
 
 import (
+	"sync"
+
 	"github.com/go-errors/errors"
 )
 
@@ -200,14 +202,20 @@ func (t tree) SetPath(path []string, data interface{}) ([]EventData, error) {
 }
 
 func (t tree) iterateDescendants(node *Node, f func(node *Node), includeSelf bool) {
-	//TODO: can we lock on a less general places without introducing data races?
 	if includeSelf {
 		f(node)
 	}
 
+	var wg sync.WaitGroup
 	for item := range node.Children.IterBuffered() {
-		t.iterateDescendants(item.Val.(*Node), f, true)
+		wg.Add(1)
+		go func(n *Node) {
+			defer wg.Done()
+			t.iterateDescendants(n, f, true)
+		}(item.Val.(*Node))
 	}
+
+	wg.Wait()
 }
 
 func (t tree) Delete(path []string) ([]EventData, bool) {
