@@ -225,14 +225,18 @@ func (t tree) Delete(path []string) ([]EventData, bool) {
 	}
 
 	eventData := make([]EventData, 0) //TODO: optimize size
+	var lock sync.Mutex
 
 	t.iterateDescendants(node, func(node *Node) {
+		lock.Lock()
 		eventData = append(eventData, EventData{
 			Key:       node.Key,
 			Operation: EventOperationDelete,
 			Path:      node.Path,
 			Value:     node.value,
 		})
+
+		lock.Unlock()
 
 		parent := node.GetParent()
 		if parent != nil { //probably root
@@ -262,7 +266,11 @@ func (t tree) getJSON(node *Node, level int) interface{} {
 		return val
 	}
 
+	var mutex sync.Mutex
 	setJSONValue := func(json map[string]interface{}, path []string, value interface{}) {
+		mutex.Lock()
+		defer mutex.Unlock()
+
 		currentJSON := json
 		for i, p := range path {
 			if i == len(path)-1 {

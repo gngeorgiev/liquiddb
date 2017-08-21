@@ -117,9 +117,12 @@ func (n *notifier) notifyLoop() {
 	for {
 		notification := <-n.notifyChannel
 
+		n.Lock()
 		for _, c := range n.handlers[notification.Operation] {
 			c <- notification
 		}
+
+		n.Unlock()
 	}
 }
 
