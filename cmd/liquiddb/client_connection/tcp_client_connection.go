@@ -52,6 +52,7 @@ func (c *tcpClientConnection) ReadJSON(o interface{}) error {
 		return deadlineErr
 	}
 
+	//TODO: tcp connections seem to get the error way after the connection is closed, can this be improved?
 	for {
 		n, err := c.conn.Read(buf)
 		if n > 0 {
