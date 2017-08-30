@@ -11,3 +11,11 @@ type ClientData struct {
 	Path      []string                   `json:"path,omitempty"`
 	Value     interface{}                `json:"value,omitempty"`
 }
+
+var (
+	OperationDelete      = operations.ClientOperationDelete
+	OperationGet         = operations.ClientOperationGet
+	OperationSet         = operations.ClientOperationSet
+	OperationSubscribe   = operations.ClientOperationSubscribe
+	OperationUnSubscribe = operations.ClientOperationUnSubscribe
+)

@@ -80,9 +80,6 @@ func (l *LiquidGo) Connect() error {
 		go func() {
 			for {
 				reconnect := <-l.disconnected
-				l.connMutex.Lock()
-				l.conn = nil
-				l.connMutex.Unlock()
 				if !reconnect {
 					break
 				}
@@ -122,6 +119,10 @@ func (l *LiquidGo) Ref(path string) *Ref {
 
 func (l *LiquidGo) RefFromArray(path []string) *Ref {
 	return l.Ref(strings.Join(path, "."))
+}
+
+func (l *LiquidGo) Root() *Ref {
+	return l.Ref("")
 }
 
 func (l *LiquidGo) Write(data ClientData) error {
@@ -183,9 +184,11 @@ func (l *LiquidGo) read() {
 
 	for {
 		n, err := l.conn.Read(buf)
-		if n > 0 {
-			data = append(data, buf[:n]...)
+		if n == 0 {
+			continue
 		}
+
+		data = append(data, buf[:n]...)
 
 		if err != nil {
 			l.errCh <- err

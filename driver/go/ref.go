@@ -36,6 +36,9 @@ func (r *Ref) Value() (<-chan interface{}, <-chan error) {
 	errCh := make(chan error)
 
 	go func() {
+		defer close(ch)
+		defer close(errCh)
+
 		clientData := ClientData{
 			ID:        rand.Uint64(),
 			Operation: operations.ClientOperationGet,
